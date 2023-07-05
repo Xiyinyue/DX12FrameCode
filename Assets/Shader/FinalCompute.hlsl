@@ -4,14 +4,10 @@ cbuffer SceneConstantBuffer : register(b0)
 {
     float4x4 MVP;
     float4x4 gWorld;
-    float3 viewPos;
-    uint scpad1;
-    float3 Look;
-    uint scpad2;
-    float3 Up;
-    uint scpad3;
-    float3 Right;
-    uint scpad4;
+    float4 viewPos;
+    float4 Look;
+    float4 Up;
+    float4 Right;
     float4 AmbientLight;
     Light Lights[MaxLights];
 }

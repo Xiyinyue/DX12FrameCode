@@ -62,14 +62,11 @@ struct SceneConstantBuffer
 {
 	XMFLOAT4X4 MVP;
 	XMFLOAT4X4 gWorld;
-	XMFLOAT3 ViewPos;
-	UINT scpad1;
-	XMFLOAT3 Look;
-	UINT scpad2;
-	XMFLOAT3 Up;
-	UINT scpad3;
-	XMFLOAT3 Right;
-	UINT scpad4;
+	XMFLOAT4 ViewPos;
+	XMFLOAT4 Look;
+	XMFLOAT4 Up;
+	XMFLOAT4 Right;
+
 	DirectX::XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
 	Light Lights[MAXLIGHTS];
 };
@@ -137,5 +134,8 @@ Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(
 	const std::string& entrypoint,
 	const std::string& target);
 
+IDXGIAdapter1* GetSupportedAdapter(
+	Microsoft::WRL::ComPtr<IDXGIFactory4>& dxgiFactory,
+	const D3D_FEATURE_LEVEL featureLevel);
 
 #endif

@@ -6,34 +6,10 @@
 //11111111111111111111111111111111111111111111
 #pragma comment(lib, "assimp-vc142-mtd.lib")
 
-Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(
-	const std::wstring& filename,
-	const D3D_SHADER_MACRO* defines,
-	const std::string& entrypoint,
-	const std::string& target)
-{
-	UINT compileFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)  
-	compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
 
-	HRESULT hr = S_OK;
-
-	Microsoft::WRL::ComPtr<ID3DBlob> byteCode = nullptr;
-	Microsoft::WRL::ComPtr<ID3DBlob> errors;
-	hr = D3DCompileFromFile(filename.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		entrypoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
-
-	if (errors != nullptr)
-		OutputDebugStringA((char*)errors->GetBufferPointer());
-
-	//ThrowIfFailed(hr);
-
-	return byteCode;
-}
 
 HWND hwnd;
-SampleCode sample;
+auto sample=std::make_unique<SampleCode>();
 
 void SampleCode::LoadModels(const char* modelFilename)
 {
@@ -189,29 +165,6 @@ void ThrowIfFailed(HRESULT hr)
 	}
 }
 
-IDXGIAdapter1* GetSupportedAdapter(Microsoft::WRL::ComPtr<IDXGIFactory4>& dxgiFactory, const D3D_FEATURE_LEVEL featureLevel)
-{
-	IDXGIAdapter1* adapter = nullptr;
-	for (std::uint32_t adapterIndex = 0U; ; ++adapterIndex)
-	{
-		IDXGIAdapter1* currentAdapter = nullptr;
-		if (DXGI_ERROR_NOT_FOUND == dxgiFactory->EnumAdapters1(adapterIndex, &currentAdapter))
-		{
-			break;
-		}
-
-		const HRESULT hres = D3D12CreateDevice(currentAdapter, featureLevel, _uuidof(ID3D12Device), nullptr);
-		if (SUCCEEDED(hres))
-		{
-			adapter = currentAdapter;
-			break;
-		}
-
-		currentAdapter->Release();
-	}
-
-	return adapter;
-}
 
 void SampleCode::WaitForPreviousFrame()
 {
@@ -386,12 +339,8 @@ void SampleCode::BuildShadersAndInputLayout()
 		UINT compileFlags = 0;
 #endif
 
-
-		mShaders["standardVS"] = CompileShader(L"Assets/Shader/shaders.hlsl", nullptr, "VSMain", "vs_5_0");
-		mShaders["opaquePS"] = CompileShader(L"Assets/Shader/shaders.hlsl", nullptr, "PSMain", "ps_5_0");
-
-		mShaders["debugVS"] = CompileShader(L"Assets/Shader/debug.hlsl", nullptr, "VS", "vs_5_0");
-		mShaders["debugPS"] = CompileShader(L"Assets/Shader/debug.hlsl", nullptr, "PS", "ps_5_0");
+		mShaders["GBufferVS"] = CompileShader(L"Assets/Shader/GBufferGenerate.hlsl", nullptr, "VS", "vs_5_0");
+		mShaders["GBufferPS"] = CompileShader(L"Assets/Shader/GBufferGenerate.hlsl", nullptr, "PS", "ps_5_0");
 
 		mShaders["FinalVS"] = CompileShader(L"Assets/Shader/FinalCompute.hlsl", nullptr, "VS", "vs_5_0");
 		mShaders["FinalPS"] = CompileShader(L"Assets/Shader/FinalCompute.hlsl", nullptr, "PS", "ps_5_0");
@@ -419,12 +368,12 @@ void SampleCode::BuildPipelineState()
 		psoDesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
 		psoDesc.pRootSignature = rootSignature.Get();
 		psoDesc.VS = {
-		reinterpret_cast<BYTE*>(mShaders["standardVS"]->GetBufferPointer()),
-		mShaders["standardVS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["FinalVS"]->GetBufferPointer()),
+		mShaders["FinalVS"]->GetBufferSize()
 		};
 		psoDesc.PS = {
-		reinterpret_cast<BYTE*>(mShaders["opaquePS"]->GetBufferPointer()),
-		mShaders["opaquePS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["FinalPS"]->GetBufferPointer()),
+		mShaders["FinalPS"]->GetBufferSize()
 		};
 		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
@@ -444,32 +393,32 @@ void SampleCode::BuildPipelineState()
 
 
 	{
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPipelineDesc = {};
-		debugPipelineDesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
-		debugPipelineDesc.pRootSignature = rootSignature.Get();
-		debugPipelineDesc.VS = {
-		reinterpret_cast<BYTE*>(mShaders["debugVS"]->GetBufferPointer()),
-		mShaders["debugVS"]->GetBufferSize()
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC GBufferPSODesc = {};
+		GBufferPSODesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
+		GBufferPSODesc.pRootSignature = rootSignature.Get();
+		GBufferPSODesc.VS = {
+		reinterpret_cast<BYTE*>(mShaders["GBufferVS"]->GetBufferPointer()),
+		mShaders["GBufferVS"]->GetBufferSize()
 		};
-		debugPipelineDesc.PS = {
-		reinterpret_cast<BYTE*>(mShaders["debugPS"]->GetBufferPointer()),
-		mShaders["debugPS"]->GetBufferSize()
+		GBufferPSODesc.PS = {
+		reinterpret_cast<BYTE*>(mShaders["GBufferPS"]->GetBufferPointer()),
+		mShaders["GBufferPS"]->GetBufferSize()
 		};
-		debugPipelineDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		debugPipelineDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		debugPipelineDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-		debugPipelineDesc.SampleMask = UINT_MAX;
-		debugPipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		debugPipelineDesc.NumRenderTargets = 5;
-		debugPipelineDesc.RTVFormats[0] = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		debugPipelineDesc.RTVFormats[1] = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		debugPipelineDesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		debugPipelineDesc.RTVFormats[3] = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		debugPipelineDesc.RTVFormats[4] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		GBufferPSODesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		GBufferPSODesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		GBufferPSODesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		GBufferPSODesc.SampleMask = UINT_MAX;
+		GBufferPSODesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		GBufferPSODesc.NumRenderTargets = 5;
+		GBufferPSODesc.RTVFormats[0] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		GBufferPSODesc.RTVFormats[1] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		GBufferPSODesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		GBufferPSODesc.RTVFormats[3] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		GBufferPSODesc.RTVFormats[4] = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
-		debugPipelineDesc.SampleDesc.Count = 1;
-		debugPipelineDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-		ThrowIfFailed(device->CreateGraphicsPipelineState(&debugPipelineDesc, IID_PPV_ARGS(&debugPipelineState)));
+		GBufferPSODesc.SampleDesc.Count = 1;
+		GBufferPSODesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		ThrowIfFailed(device->CreateGraphicsPipelineState(&GBufferPSODesc, IID_PPV_ARGS(&GBufferPSO)));
 	}
 
 
@@ -755,56 +704,27 @@ void SampleCode::LoadAsset()
 	}
 }
 
-void SampleCode::PopulateCommandList()
+void SampleCode::RenderGBuffer()
 {
-	ThrowIfFailed(commandAllocator->Reset());
-	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), pipelineState.Get()));
-
-	commandList->SetGraphicsRootSignature(rootSignature.Get());
-	ID3D12DescriptorHeap* ppHeaps[] = { cbvsrvHeap.Get() };
-	commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-	auto cbaddress = ObjCBResource->GetGPUVirtualAddress();
-	auto matCBAdress = MaterialCBResource->GetGPUVirtualAddress();
-	commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
-
-	commandList->SetGraphicsRootShaderResourceView(2, matCBAdress);
-
-	commandList->RSSetViewports(1, &viewport);
-	commandList->RSSetScissorRects(1, &scissorRect);
-
-
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvHeap->GetCPUDescriptorHandleForHeapStart(), frameIndex, rtvDescriptorSize);
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
-	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
-	//const float clearColor[] = { color[0], color[1], color[2], 1.0f };
+	auto cbaddress = ObjCBResource->GetGPUVirtualAddress();
+	auto matCBAdress = MaterialCBResource->GetGPUVirtualAddress();
 	const float clearColor[] = { 0.690196097f, 0.768627524f, 0.870588303f, 1.000000000f };
-	//const float clearColor[] = { 0.0f ,0.0f ,0.0f, 1.000000000f };
-	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+	commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 	commandList->IASetIndexBuffer(&indexBufferView);
 
+	commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
+	commandList->SetGraphicsRootShaderResourceView(2, matCBAdress);
 	commandList->SetGraphicsRootConstantBufferView(1, cbaddress);
-	//  	for (auto t : mObjRenderItems) {
-	// 
-	//  	commandList->SetGraphicsRootConstantBufferView(1, cbaddress + t.second.ObjCBIndex * ObjCBsize);
-	//  	commandList->DrawIndexedInstanced(t.second.IndicesCount, 1, t.second.StartIndexLocation, t.second.BaseVertexLocation, 0);
-	//  	}
 
-
-	{
-
-		commandList->SetPipelineState(debugPipelineState.Get());
-		GBufferResources[0]->SetName(L"GBufferResources0");
-		GBufferResources[1]->SetName(L"GBufferResources1");
+	
+		commandList->SetPipelineState(GBufferPSO.Get());
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE GBufferRtvHanle(rtvHeap->GetCPUDescriptorHandleForHeapStart(), 2, rtvDescriptorSize);
 		for (int i = 0; i < _countof(GBufferResources); i++)
@@ -833,9 +753,51 @@ void SampleCode::PopulateCommandList()
 				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 		}
 
+}
 
-		//commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-		//commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+void SampleCode::FinalRender()
+{
+	ThrowIfFailed(commandAllocator->Reset());
+	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), pipelineState.Get()));
+
+	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	ID3D12DescriptorHeap* ppHeaps[] = { cbvsrvHeap.Get() };
+	commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+
+	auto cbaddress = ObjCBResource->GetGPUVirtualAddress();
+	auto matCBAdress = MaterialCBResource->GetGPUVirtualAddress();
+
+
+
+
+	commandList->RSSetViewports(1, &viewport);
+	commandList->RSSetScissorRects(1, &scissorRect);
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvHeap->GetCPUDescriptorHandleForHeapStart(), frameIndex, rtvDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+
+
+	const float clearColor[] = { 0.690196097f, 0.768627524f, 0.870588303f, 1.000000000f };
+
+	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetIndexBuffer(&indexBufferView);
+
+	commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
+	commandList->SetGraphicsRootShaderResourceView(2, matCBAdress);
+	commandList->SetGraphicsRootConstantBufferView(1, cbaddress);
+
+	{
+		RenderGBuffer();
+
+
 		commandList->SetPipelineState(FinalPipelineState.Get());
 		cbvsrvHeap->GetGPUDescriptorHandleForHeapStart();
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
@@ -886,10 +848,20 @@ void SampleCode::OnUpdate()
 	SceneConstantBuffer passCBconstants;
 	XMStoreFloat4x4(&passCBconstants.MVP, XMMatrixTranspose(MVP));
 	XMStoreFloat4x4(&passCBconstants.gWorld, XMMatrixTranspose(m));
-	passCBconstants.ViewPos = camera.getPosition();
-	passCBconstants.Look = camera.getmLook();
-	passCBconstants.Up = camera.getmUp();
-	passCBconstants.Right = camera.getmRight();
+
+	XMFLOAT3 lightPosition= { -0.0000,1.90000,0.00000 };
+	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
+	XMVECTOR direction = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	//XMMATRIX lightViewMatrix = XMMatrixLookToRH(eyePosition, direction, upDirection);
+
+
+
+
+	passCBconstants.ViewPos = DirectX::XMFLOAT4{ camera.getPosition().x,camera.getPosition().y,camera.getPosition().z,0.0f };
+	passCBconstants.Look = DirectX::XMFLOAT4{ camera.getmLook().x,camera.getmLook().y,camera.getmLook().z,0.0f };
+	passCBconstants.Up = DirectX::XMFLOAT4{ camera.getmUp().x,camera.getmUp().y,camera.getmUp().z,0.0f };
+	passCBconstants.Right=DirectX::XMFLOAT4{ camera.getmRight().x,camera.getmRight().y,camera.getmRight().z,0.0f };
 	passCBconstants.AmbientLight = { 0.01f, 0.01f, 0.01f, 1.0f };
 	passCBconstants.Lights[0].Position = { -0.0000,1.90000,0.00000 };
 	passCBconstants.Lights[0].SpotPower = 0.8f;
@@ -925,7 +897,7 @@ void SampleCode::OnUpdate()
 
 void SampleCode::OnRender()
 {
-	PopulateCommandList();
+	FinalRender();
 
 	ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
@@ -951,11 +923,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	switch (message)
 	{
 	case WM_PAINT:
-		sample.OnUpdate();
-		sample.OnRender();
+		sample->OnUpdate();
+		sample->OnRender();
 		return 0;
 	case WM_MOUSEMOVE:
-		sample.OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		sample->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -990,13 +962,13 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 		hInstance,
 		nullptr);
 
-	sample.camera.SetPosition(-3.0f, 1.0f, 0.0f);
-	sample.ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
-	sample.InitD3DResource();
-	sample.LoadModels("Resources/anotherCornellBox.obj");
-	sample.GenerateTestTextureRenderItem(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
+	sample->camera.SetPosition(-3.0f, 1.0f, 0.0f);
+	sample->ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
+	sample->InitD3DResource();
+	sample->LoadModels("Resources/anotherCornellBox.obj");
+	sample->GenerateTestTextureRenderItem(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
 	//GenerateTestTextureRenderItem(0.0f, -0.5, 0.5f, 0.5f, 0.0f);
-	sample.LoadAsset();
+	sample->LoadAsset();
 
 	ShowWindow(hwnd, SW_SHOW);
 
@@ -1014,7 +986,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 		}
 	}
 
-	sample.OnDestroy();
+	sample->OnDestroy();
 
 	return 0;
 }

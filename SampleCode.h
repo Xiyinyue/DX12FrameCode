@@ -22,7 +22,7 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvsrvHeap;
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> debugPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> GBufferPSO;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> FinalPipelineState;
 
 
@@ -89,7 +89,7 @@ public:
 	void OnUpdate();
 	void OnKeyboardInput();
 	void OnMouseMove(WPARAM btnState, int x, int y);
-	void PopulateCommandList();
+	void FinalRender();
 	void WaitForPreviousFrame();
 	void LoadAsset();
 	void BuildRootSignature();
@@ -98,6 +98,7 @@ public:
 	void BuildVertexIndexBuffer();
 	void BuildDepthStencilBuffer();
 	void GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth);
+	void RenderGBuffer();
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 };
 
