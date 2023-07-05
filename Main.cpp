@@ -1,19 +1,4 @@
-#include<Windows.h>
-#include <d3d12.h>
-#include <dxgi1_4.h>
-#include <wrl.h>
-#include <d3dcompiler.h>
-#include <wincodec.h>
-#include <windowsx.h>
-#include<iostream>
-#include <unordered_map>
-#include "../DXUtils/d3dx12.h"
-#include "Camera.h"
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <array>
-
+#include "SampleCode.h"
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -21,234 +6,35 @@
 //11111111111111111111111111111111111111111111
 #pragma comment(lib, "assimp-vc142-mtd.lib")
 
-using namespace Microsoft::WRL;
-
-constexpr UINT MAXLIGHTS = 16;
-struct Vertex
-{
-	XMFLOAT3 position;
-	XMFLOAT3 Normal;
-	XMFLOAT2 TexCoordinate;
-};
-
-struct Light
-{
-	DirectX::XMFLOAT3 Strength = { 0.5f, 0.5f, 0.5f };
-	float FalloffStart = 1.0f;                          // point/spot light only
-	DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };// directional/spot light only
-	float FalloffEnd = 5.0f;                           // point/spot light only
-	DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };  // point/spot light only
-	float SpotPower = 64.0f;                            // spot light only
-
-};
-struct SceneConstantBuffer
-{
-	XMFLOAT4X4 MVP;
-	XMFLOAT4X4 gWorld;
-	XMFLOAT3 ViewPos;
-	UINT scpad1;
-	XMFLOAT3 Look;
-	UINT scpad2;
-	XMFLOAT3 Up;
-	UINT scpad3;
-	XMFLOAT3 Right;
-	UINT scpad4;
-	DirectX::XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
-	Light Lights[MAXLIGHTS];
-};
-struct ObjConstantBuffer
-{
-	XMFLOAT4X4 WorldTransform;
-	XMFLOAT4X4 TexTransform;
-	UINT MaterialIndex;
-	UINT     CBPad1;
-	UINT     CBPad2;
-	UINT     CBPad3;
-};
-
-struct Material
-{
-	std::string name;
-	UINT matCBIndex;
-	UINT DiffuseSrvHeapIndex;
-	UINT NormalSrvHeapIndex;
-	float Frenel;
-	float Roughness;
-	XMFLOAT4X4 matTransForm;
-	XMFLOAT3 ambient;
-	XMFLOAT3 specular;
-	XMFLOAT3 diffuse;
-};
-
-
-std::vector<Material>mMaterial;
-DirectX::XMMATRIX InitMatrix4X4()
-{
-	DirectX::XMMATRIX I(
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f);
-	return I;
-}
-DirectX::XMFLOAT4X4 InitFloat4X4()
-{
-	DirectX::XMFLOAT4X4 I(
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f);
-	return I;
-}
-struct Mesh
-{
-	std::string name;
-	std::vector<Vertex> vertices;
-	std::vector<std::uint32_t> indices;
-};
-
-struct MaterialConstants
-{
-	DirectX::XMFLOAT3 Diffuse = { 1.0f, 1.0f, 1.0f };
-	UINT matpad0;
-	DirectX::XMFLOAT3 Specular = { 0.01f, 0.01f, 0.01f };
-	UINT matpad1;
-	DirectX::XMFLOAT3 Ambient = { 0.01f, 0.01f, 0.01f };
-	UINT matpad2;
-	// Used in texture mapping.
-	DirectX::XMFLOAT4X4 MatTransform = InitFloat4X4();
-};
-
-//draw directly operate the Instance: 
-//IndexCount 
-//StartIndexLocation 
-//BaseVertexLocation
-struct  RenderItem
-{
-	UINT BaseVertexLocation = 0;
-	UINT StartIndexLocation = 0;
-	UINT IndicesCount = 0;
-	Material mat;
-	UINT ObjCBIndex = -1;
-	UINT matIndex = 0;
-
-};
-std::unordered_map<std::string, RenderItem>mObjRenderItems;
-	std::vector<RenderItem>TestTextureRenderItem;
-
-	static const UINT FrameCount = 2;
-	UINT width = 800;
-	UINT height = 600;
-	HWND hwnd;
-
-	//管线对象
-	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, width, height);
-	CD3DX12_RECT scissorRect = CD3DX12_RECT(0, 0, width, height);
-	ComPtr<IDXGISwapChain3> swapChain;
-	ComPtr<ID3D12Device> device;
-	ComPtr<ID3D12Resource> renderTargets[FrameCount];
-	ComPtr<ID3D12CommandAllocator> commandAllocator;
-	ComPtr<ID3D12CommandQueue> commandQueue;
-	ComPtr<ID3D12RootSignature> rootSignature;
-	ComPtr<ID3D12DescriptorHeap> rtvHeap;
-	ComPtr<ID3D12DescriptorHeap> dsvHeap;
-	ComPtr<ID3D12DescriptorHeap> cbvsrvHeap;
-
-	ComPtr<ID3D12PipelineState> pipelineState;
-	ComPtr<ID3D12PipelineState> debugPipelineState;
-	ComPtr<ID3D12PipelineState> FinalPipelineState;
-
-
-	ComPtr<ID3D12GraphicsCommandList> commandList;
-	UINT rtvDescriptorSize;
-
-	ComPtr<ID3D12Resource> vertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-	ComPtr<ID3D12Resource> indexBuffer;
-	D3D12_INDEX_BUFFER_VIEW indexBufferView;
-
-	ComPtr<ID3D12Resource> depthStencilBuffer;
-
-	ComPtr<ID3D12Resource> constantBuffer;
-	ComPtr<ID3D12Resource>ObjCBResource;
-
-	ComPtr<ID3D12Resource> MaterialCBResource;
-
-	UINT8* pCbvDataBegin;
-	UINT8* pobjCbvDataBegin;
-	UINT8* pMatCbvDataBegin;
-	UINT meshIndex = 0;
-	UINT ObjCBsize;
-	UINT matCBsize;
-	UINT mCbvSrvUavDescriptorSize = 0;
-	// 同步对象
-	UINT frameIndex;
-	HANDLE fenceEvent;
-	ComPtr<ID3D12Fence> fence;
-	UINT64 fenceValue;
-
-	//time
-	float offset;
-	bool isOffset = false;
-
-
-	//
-	ComPtr<ID3D12Resource> textureBuffer;
-	ComPtr<ID3D12Resource> textureBufferUploadHeap;
-	UINT cbvsrvDescriptorSize;
-	BYTE* imageData;
-	//
-
-	ComPtr<ID3D12Resource>GBufferResources[5];
-
-	//
-	POINT lastMousePos;
-	Camera camera;
-	//
-
-	//
-	UINT VertexOffset = 0;
-	UINT IndexOffset = 0;
-	//
-	std::vector<Mesh> meshes;
-	std::unordered_map<std::string, Mesh>mMesh;
-	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
-	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
-class SampleCode
-{
-public:
-
-public:
-	void OnDestroy();
-	void OnRender();
-	void LoadModels(const char* modelFilename);
-	void InitD3DResource();
-	void OnUpdate();
-	void OnKeyboardInput();
-	void OnMouseMove(WPARAM btnState, int x, int y);
-	void PopulateCommandList();
-	void WaitForPreviousFrame();
-	void LoadAsset();
-	void BuildRootSignature();
-	void BuildShadersAndInputLayout();
-	void BuildPipelineState();
-	void BuildVertexIndexBuffer();
-	void BuildDepthStencilBuffer();
-	void GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth);
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
-};
-
-SampleCode sample;
-
-
-
-
-
-ComPtr<ID3DBlob> CompileShader(
+Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(
 	const std::wstring& filename,
 	const D3D_SHADER_MACRO* defines,
 	const std::string& entrypoint,
-	const std::string& target);
+	const std::string& target)
+{
+	UINT compileFlags = 0;
+#if defined(DEBUG) || defined(_DEBUG)  
+	compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+	HRESULT hr = S_OK;
+
+	Microsoft::WRL::ComPtr<ID3DBlob> byteCode = nullptr;
+	Microsoft::WRL::ComPtr<ID3DBlob> errors;
+	hr = D3DCompileFromFile(filename.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		entrypoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
+
+	if (errors != nullptr)
+		OutputDebugStringA((char*)errors->GetBufferPointer());
+
+	//ThrowIfFailed(hr);
+
+	return byteCode;
+}
+
+HWND hwnd;
+SampleCode sample;
+
 void SampleCode::LoadModels(const char* modelFilename)
 {
 	UINT IndexLocation = 0;
@@ -379,24 +165,6 @@ void SampleCode::OnKeyboardInput()
 	camera.UpdateViewMatrix();
 }
 
-template <typename T>
-constexpr UINT CalcConstantBufferByteSize()
-{
-	// Constant buffers must be a multiple of the minimum hardware
-	// allocation size (usually 256 bytes).  So round up to nearest
-	// multiple of 256.  We do this by adding 255 and then masking off
-	// the lower 2 bytes which store all bits < 256.
-	// Example: Suppose byteSize = 300.
-	// (300 + 255) & ~255
-	// 555 & ~255
-	// 0x022B & ~0x00ff
-	// 0x022B & 0xff00
-	// 0x0200
-	// 512
-	UINT byteSize = sizeof(T);
-	return (byteSize + 255) & ~255;
-}
-
 std::string HrToString(HRESULT hr)
 {
 	char s_str[64] = {};
@@ -421,7 +189,7 @@ void ThrowIfFailed(HRESULT hr)
 	}
 }
 
-IDXGIAdapter1* GetSupportedAdapter(ComPtr<IDXGIFactory4>& dxgiFactory, const D3D_FEATURE_LEVEL featureLevel)
+IDXGIAdapter1* GetSupportedAdapter(Microsoft::WRL::ComPtr<IDXGIFactory4>& dxgiFactory, const D3D_FEATURE_LEVEL featureLevel)
 {
 	IDXGIAdapter1* adapter = nullptr;
 	for (std::uint32_t adapterIndex = 0U; ; ++adapterIndex)
@@ -465,7 +233,7 @@ void SampleCode::InitD3DResource()
 
 #if defined(_DEBUG)
 	{
-		ComPtr<ID3D12Debug> debugController;
+		Microsoft::WRL::ComPtr<ID3D12Debug> debugController;
 		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 		{
 			debugController->EnableDebugLayer();
@@ -473,7 +241,7 @@ void SampleCode::InitD3DResource()
 	}
 #endif 
 
-	ComPtr<IDXGIFactory4> mDxgiFactory;
+	Microsoft::WRL::ComPtr<IDXGIFactory4> mDxgiFactory;
 	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(mDxgiFactory.GetAddressOf())));
 	D3D_FEATURE_LEVEL featureLevels[] =
 	{
@@ -513,7 +281,7 @@ void SampleCode::InitD3DResource()
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
 
-	ComPtr<IDXGISwapChain1> swapChain1;
+	Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain1;
 	ThrowIfFailed(mDxgiFactory->CreateSwapChainForHwnd(
 		commandQueue.Get(),
 		hwnd,
@@ -586,8 +354,8 @@ void SampleCode::BuildRootSignature()
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(4, rootParameters, (UINT)staticSamplers.size(), staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		// create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
-		ComPtr<ID3DBlob> serializedRootSig = nullptr;
-		ComPtr<ID3DBlob> errorBlob = nullptr;
+		Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 		HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1,
 			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
 
@@ -1222,8 +990,8 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 		hInstance,
 		nullptr);
 
-	camera.SetPosition(-3.0f, 1.0f, 0.0f);
-	ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
+	sample.camera.SetPosition(-3.0f, 1.0f, 0.0f);
+	sample.ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
 	sample.InitD3DResource();
 	sample.LoadModels("Resources/anotherCornellBox.obj");
 	sample.GenerateTestTextureRenderItem(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
@@ -1249,31 +1017,6 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 	sample.OnDestroy();
 
 	return 0;
-}
-ComPtr<ID3DBlob> CompileShader(
-	const std::wstring& filename,
-	const D3D_SHADER_MACRO* defines,
-	const std::string& entrypoint,
-	const std::string& target)
-{
-	UINT compileFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)  
-	compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
-
-	HRESULT hr = S_OK;
-
-	ComPtr<ID3DBlob> byteCode = nullptr;
-	ComPtr<ID3DBlob> errors;
-	hr = D3DCompileFromFile(filename.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		entrypoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
-
-	if (errors != nullptr)
-		OutputDebugStringA((char*)errors->GetBufferPointer());
-
-	//ThrowIfFailed(hr);
-
-	return byteCode;
 }
 void SampleCode::GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth)
 {
