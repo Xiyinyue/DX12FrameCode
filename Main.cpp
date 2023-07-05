@@ -33,13 +33,13 @@ struct Vertex
 
 struct Light
 {
-		DirectX::XMFLOAT3 Strength = { 0.5f, 0.5f, 0.5f };
-		float FalloffStart = 1.0f;                          // point/spot light only
-		DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };// directional/spot light only
-		float FalloffEnd = 5.0f;                           // point/spot light only
-		DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };  // point/spot light only
-		float SpotPower = 64.0f;                            // spot light only
-	
+	DirectX::XMFLOAT3 Strength = { 0.5f, 0.5f, 0.5f };
+	float FalloffStart = 1.0f;                          // point/spot light only
+	DirectX::XMFLOAT3 Direction = { 0.0f, -1.0f, 0.0f };// directional/spot light only
+	float FalloffEnd = 5.0f;                           // point/spot light only
+	DirectX::XMFLOAT3 Position = { 0.0f, 0.0f, 0.0f };  // point/spot light only
+	float SpotPower = 64.0f;                            // spot light only
+
 };
 struct SceneConstantBuffer
 {
@@ -100,13 +100,20 @@ DirectX::XMFLOAT4X4 InitFloat4X4()
 		0.0f, 0.0f, 0.0f, 1.0f);
 	return I;
 }
+struct Mesh
+{
+	std::string name;
+	std::vector<Vertex> vertices;
+	std::vector<std::uint32_t> indices;
+};
+
 struct MaterialConstants
 {
 	DirectX::XMFLOAT3 Diffuse = { 1.0f, 1.0f, 1.0f };
 	UINT matpad0;
 	DirectX::XMFLOAT3 Specular = { 0.01f, 0.01f, 0.01f };
 	UINT matpad1;
-	DirectX::XMFLOAT3 Ambient = { 0.01f, 0.01f, 0.01f};
+	DirectX::XMFLOAT3 Ambient = { 0.01f, 0.01f, 0.01f };
 	UINT matpad2;
 	// Used in texture mapping.
 	DirectX::XMFLOAT4X4 MatTransform = InitFloat4X4();
@@ -126,116 +133,123 @@ struct  RenderItem
 	UINT matIndex = 0;
 
 };
-
-
 std::unordered_map<std::string, RenderItem>mObjRenderItems;
-std::vector<RenderItem>TestTextureRenderItem;
+	std::vector<RenderItem>TestTextureRenderItem;
 
-const UINT FrameCount = 2;
-UINT width = 800;
-UINT height = 600;
-HWND hwnd;
+	static const UINT FrameCount = 2;
+	UINT width = 800;
+	UINT height = 600;
+	HWND hwnd;
 
-//管线对象
-CD3DX12_VIEWPORT viewport(0.0f, 0.0f, width, height);
-CD3DX12_RECT scissorRect(0, 0, width, height);
-ComPtr<IDXGISwapChain3> swapChain;
-ComPtr<ID3D12Device> device;
-ComPtr<ID3D12Resource> renderTargets[FrameCount];
-ComPtr<ID3D12CommandAllocator> commandAllocator;
-ComPtr<ID3D12CommandQueue> commandQueue;
-ComPtr<ID3D12RootSignature> rootSignature;
-ComPtr<ID3D12DescriptorHeap> rtvHeap;
-ComPtr<ID3D12DescriptorHeap> dsvHeap;
-ComPtr<ID3D12DescriptorHeap> cbvsrvHeap;
+	//管线对象
+	CD3DX12_VIEWPORT viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, width, height);
+	CD3DX12_RECT scissorRect = CD3DX12_RECT(0, 0, width, height);
+	ComPtr<IDXGISwapChain3> swapChain;
+	ComPtr<ID3D12Device> device;
+	ComPtr<ID3D12Resource> renderTargets[FrameCount];
+	ComPtr<ID3D12CommandAllocator> commandAllocator;
+	ComPtr<ID3D12CommandQueue> commandQueue;
+	ComPtr<ID3D12RootSignature> rootSignature;
+	ComPtr<ID3D12DescriptorHeap> rtvHeap;
+	ComPtr<ID3D12DescriptorHeap> dsvHeap;
+	ComPtr<ID3D12DescriptorHeap> cbvsrvHeap;
 
-ComPtr<ID3D12PipelineState> pipelineState;
-ComPtr<ID3D12PipelineState> debugPipelineState;
-ComPtr<ID3D12PipelineState> FinalPipelineState;
-
-
-ComPtr<ID3D12GraphicsCommandList> commandList;
-UINT rtvDescriptorSize;
-
-ComPtr<ID3D12Resource> vertexBuffer;
-D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-ComPtr<ID3D12Resource> indexBuffer;
-D3D12_INDEX_BUFFER_VIEW indexBufferView;
-
-ComPtr<ID3D12Resource> depthStencilBuffer;
-
-ComPtr<ID3D12Resource> constantBuffer;
-ComPtr<ID3D12Resource>ObjCBResource;
-
-ComPtr<ID3D12Resource> MaterialCBResource;
-
-UINT8* pCbvDataBegin;
-UINT8* pobjCbvDataBegin;
-UINT8* pMatCbvDataBegin;
-UINT meshIndex = 0;
- UINT ObjCBsize;
- UINT matCBsize;
-UINT mCbvSrvUavDescriptorSize = 0;
-// 同步对象
-UINT frameIndex;
-HANDLE fenceEvent;
-ComPtr<ID3D12Fence> fence;
-UINT64 fenceValue;
-
-//time
-float offset;
-bool isOffset = false;
+	ComPtr<ID3D12PipelineState> pipelineState;
+	ComPtr<ID3D12PipelineState> debugPipelineState;
+	ComPtr<ID3D12PipelineState> FinalPipelineState;
 
 
-//
-ComPtr<ID3D12Resource> textureBuffer;
-ComPtr<ID3D12Resource> textureBufferUploadHeap;
-UINT cbvsrvDescriptorSize;
-BYTE* imageData;
-//
+	ComPtr<ID3D12GraphicsCommandList> commandList;
+	UINT rtvDescriptorSize;
 
-ComPtr<ID3D12Resource>GBufferResources[5];
+	ComPtr<ID3D12Resource> vertexBuffer;
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
+	ComPtr<ID3D12Resource> indexBuffer;
+	D3D12_INDEX_BUFFER_VIEW indexBufferView;
 
-//
-POINT lastMousePos;
-Camera camera;
-//
+	ComPtr<ID3D12Resource> depthStencilBuffer;
 
-//
-UINT VertexOffset = 0;
-UINT IndexOffset = 0;
-//
-struct Mesh
+	ComPtr<ID3D12Resource> constantBuffer;
+	ComPtr<ID3D12Resource>ObjCBResource;
+
+	ComPtr<ID3D12Resource> MaterialCBResource;
+
+	UINT8* pCbvDataBegin;
+	UINT8* pobjCbvDataBegin;
+	UINT8* pMatCbvDataBegin;
+	UINT meshIndex = 0;
+	UINT ObjCBsize;
+	UINT matCBsize;
+	UINT mCbvSrvUavDescriptorSize = 0;
+	// 同步对象
+	UINT frameIndex;
+	HANDLE fenceEvent;
+	ComPtr<ID3D12Fence> fence;
+	UINT64 fenceValue;
+
+	//time
+	float offset;
+	bool isOffset = false;
+
+
+	//
+	ComPtr<ID3D12Resource> textureBuffer;
+	ComPtr<ID3D12Resource> textureBufferUploadHeap;
+	UINT cbvsrvDescriptorSize;
+	BYTE* imageData;
+	//
+
+	ComPtr<ID3D12Resource>GBufferResources[5];
+
+	//
+	POINT lastMousePos;
+	Camera camera;
+	//
+
+	//
+	UINT VertexOffset = 0;
+	UINT IndexOffset = 0;
+	//
+	std::vector<Mesh> meshes;
+	std::unordered_map<std::string, Mesh>mMesh;
+	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
+class SampleCode
 {
-	std::string name;
-	std::vector<Vertex> vertices;
-	std::vector<std::uint32_t> indices;
+public:
+
+public:
+	void OnDestroy();
+	void OnRender();
+	void LoadModels(const char* modelFilename);
+	void InitD3DResource();
+	void OnUpdate();
+	void OnKeyboardInput();
+	void OnMouseMove(WPARAM btnState, int x, int y);
+	void PopulateCommandList();
+	void WaitForPreviousFrame();
+	void LoadAsset();
+	void BuildRootSignature();
+	void BuildShadersAndInputLayout();
+	void BuildPipelineState();
+	void BuildVertexIndexBuffer();
+	void BuildDepthStencilBuffer();
+	void GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth);
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 };
 
+SampleCode sample;
 
-std::vector<Mesh> meshes;
-std::unordered_map<std::string, Mesh>mMesh;
-std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
-std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
 
-void OnDestroy();
-void OnRender();
-void LoadModels(const char* modelFilename);
-void InitD3DResource();
-void OnUpdate();
-void OnKeyboardInput();
-void OnMouseMove();
-void PopulateCommandList();
-void WaitForPreviousFrame();
-void LoadAsset();
-void GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth);
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
+
+
+
 ComPtr<ID3DBlob> CompileShader(
 	const std::wstring& filename,
 	const D3D_SHADER_MACRO* defines,
 	const std::string& entrypoint,
 	const std::string& target);
-void LoadModels(const char* modelFilename)
+void SampleCode::LoadModels(const char* modelFilename)
 {
 	UINT IndexLocation = 0;
 	UINT VertexLocation = 0;
@@ -259,20 +273,20 @@ void LoadModels(const char* modelFilename)
 		tempMaterial.ambient = XMFLOAT3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
 		tempMaterial.name = (mat->GetName().C_Str());
 		mat->Get(AI_MATKEY_COLOR_DIFFUSE, MaterialColor);//ka
-		
+
 		tempMaterial.diffuse = XMFLOAT3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
 
 		mat->Get(AI_MATKEY_COLOR_SPECULAR, MaterialColor);
-	tempMaterial.specular = XMFLOAT3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
+		tempMaterial.specular = XMFLOAT3(MaterialColor.r, MaterialColor.g, MaterialColor.b);
 		//mat->Get(AI_MATKEY_, MaterialColor);
-		
+
 
 		mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, MaterialColor);
 		//mat->Get()
-		
+
 
 		mMaterial.push_back(tempMaterial);
-	
+
 	}
 	for (std::uint32_t i = 0U; i < scene->mNumMeshes; ++i)
 	{
@@ -287,7 +301,7 @@ void LoadModels(const char* modelFilename)
 			for (std::uint32_t i = 0U; i < numVertices; ++i)
 			{
 				tempMesh.vertices[i].position = XMFLOAT3(reinterpret_cast<const float*>(&mesh->mVertices[i]));
-				tempMesh.vertices[i].Normal= XMFLOAT3(reinterpret_cast<const float*>(&mesh->mNormals[i]));
+				tempMesh.vertices[i].Normal = XMFLOAT3(reinterpret_cast<const float*>(&mesh->mNormals[i]));
 				//tempMesh.vertices[i].TexCoordinate= XMFLOAT3(reinterpret_cast<const float*>(&mesh->mTextureCoords));
 			}
 			// Indices
@@ -305,7 +319,7 @@ void LoadModels(const char* modelFilename)
 				tempMesh.indices.push_back(face->mIndices[1U]);
 				tempMesh.indices.push_back(face->mIndices[2U]);
 			}
-		
+
 			if (mesh->HasTextureCoords(0U))
 			{
 				assert(mesh->GetNumUVChannels() == 1U);
@@ -315,12 +329,12 @@ void LoadModels(const char* modelFilename)
 				{
 					tempMesh.vertices[i].TexCoordinate = XMFLOAT2(reinterpret_cast<const float*>(&aiTextureCoordinates[i]));
 				}
-			}	
-			mObjRenderItems[mesh->mName.C_Str()].BaseVertexLocation=VertexOffset;
-			mObjRenderItems[mesh->mName.C_Str()].StartIndexLocation= IndexOffset;
+			}
+			mObjRenderItems[mesh->mName.C_Str()].BaseVertexLocation = VertexOffset;
+			mObjRenderItems[mesh->mName.C_Str()].StartIndexLocation = IndexOffset;
 			mObjRenderItems[mesh->mName.C_Str()].IndicesCount = numFaces * 3;
-			mObjRenderItems[mesh->mName.C_Str()].mat.matCBIndex= mesh->mMaterialIndex;
-			mObjRenderItems[mesh->mName.C_Str()].ObjCBIndex= meshIndex;
+			mObjRenderItems[mesh->mName.C_Str()].mat.matCBIndex = mesh->mMaterialIndex;
+			mObjRenderItems[mesh->mName.C_Str()].ObjCBIndex = meshIndex;
 			VertexOffset += numVertices;
 			IndexOffset += (numFaces * 3);
 		}
@@ -331,7 +345,7 @@ void LoadModels(const char* modelFilename)
 
 }
 
-void OnMouseMove(WPARAM btnState, int x, int y)
+void SampleCode::OnMouseMove(WPARAM btnState, int x, int y)
 {
 	if ((btnState & MK_LBUTTON) != 0)
 	{
@@ -346,7 +360,7 @@ void OnMouseMove(WPARAM btnState, int x, int y)
 	lastMousePos.y = y;
 }
 
-void OnKeyboardInput()
+void SampleCode::OnKeyboardInput()
 {
 	const float dt = 0.01f;
 
@@ -431,7 +445,7 @@ IDXGIAdapter1* GetSupportedAdapter(ComPtr<IDXGIFactory4>& dxgiFactory, const D3D
 	return adapter;
 }
 
-void WaitForPreviousFrame()
+void SampleCode::WaitForPreviousFrame()
 {
 	const UINT64 tempFenceValue = fenceValue;
 	ThrowIfFailed(commandQueue->Signal(fence.Get(), tempFenceValue));
@@ -446,7 +460,7 @@ void WaitForPreviousFrame()
 	frameIndex = swapChain->GetCurrentBackBufferIndex();
 }
 
-void InitD3DResource()
+void SampleCode::InitD3DResource()
 {
 
 #if defined(_DEBUG)
@@ -461,7 +475,6 @@ void InitD3DResource()
 
 	ComPtr<IDXGIFactory4> mDxgiFactory;
 	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(mDxgiFactory.GetAddressOf())));
-
 	D3D_FEATURE_LEVEL featureLevels[] =
 	{
 		D3D_FEATURE_LEVEL_12_1,
@@ -515,7 +528,7 @@ void InitD3DResource()
 
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = FrameCount+5;
+		rtvHeapDesc.NumDescriptors = FrameCount + 5;
 		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		ThrowIfFailed(device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap)));
@@ -546,13 +559,13 @@ void InitD3DResource()
 		rtvHandle.Offset(1, rtvDescriptorSize);
 	}
 
-	
+
 
 
 	ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
 }
 
-void BuildRootSignature()
+void SampleCode::BuildRootSignature()
 {
 	mCbvSrvUavDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	{
@@ -561,7 +574,7 @@ void BuildRootSignature()
 		CD3DX12_ROOT_PARAMETER rootParameters[4];
 
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
-		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 1,0);
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 1, 0);
 
 		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
 		rootParameters[1].InitAsConstantBufferView(1);
@@ -570,8 +583,8 @@ void BuildRootSignature()
 
 
 		auto staticSamplers = GetStaticSamplers();
-		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(4, rootParameters, (UINT)staticSamplers.size(), staticSamplers.data(), 
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(4, rootParameters, (UINT)staticSamplers.size(), staticSamplers.data(),
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		// create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
 		ComPtr<ID3DBlob> serializedRootSig = nullptr;
 		ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -593,7 +606,7 @@ void BuildRootSignature()
 
 
 }
-void BuildShadersAndInputLayout()
+void SampleCode::BuildShadersAndInputLayout()
 {
 	{
 		// 		ComPtr<ID3DBlob> vertexShader;
@@ -605,11 +618,11 @@ void BuildShadersAndInputLayout()
 		UINT compileFlags = 0;
 #endif
 
-		
+
 		mShaders["standardVS"] = CompileShader(L"Assets/Shader/shaders.hlsl", nullptr, "VSMain", "vs_5_0");
 		mShaders["opaquePS"] = CompileShader(L"Assets/Shader/shaders.hlsl", nullptr, "PSMain", "ps_5_0");
 
-		mShaders["debugVS"]= CompileShader(L"Assets/Shader/debug.hlsl", nullptr, "VS", "vs_5_0");
+		mShaders["debugVS"] = CompileShader(L"Assets/Shader/debug.hlsl", nullptr, "VS", "vs_5_0");
 		mShaders["debugPS"] = CompileShader(L"Assets/Shader/debug.hlsl", nullptr, "PS", "ps_5_0");
 
 		mShaders["FinalVS"] = CompileShader(L"Assets/Shader/FinalCompute.hlsl", nullptr, "VS", "vs_5_0");
@@ -627,7 +640,7 @@ void BuildShadersAndInputLayout()
 }
 
 
-void BuildPipelineState()
+void SampleCode::BuildPipelineState()
 {
 
 
@@ -657,39 +670,39 @@ void BuildPipelineState()
 		ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
 	}
 
-	
 
 
 
 
- 	{
- 		D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPipelineDesc = {};
- 		debugPipelineDesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
- 		debugPipelineDesc.pRootSignature = rootSignature.Get();
- 		debugPipelineDesc.VS = {
- 		reinterpret_cast<BYTE*>(mShaders["debugVS"]->GetBufferPointer()),
- 		mShaders["debugVS"]->GetBufferSize()
- 		};
- 		debugPipelineDesc.PS = {
- 		reinterpret_cast<BYTE*>(mShaders["debugPS"]->GetBufferPointer()),
- 		mShaders["debugPS"]->GetBufferSize()
- 		};
- 		debugPipelineDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
- 		debugPipelineDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
- 		debugPipelineDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
- 		debugPipelineDesc.SampleMask = UINT_MAX;
- 		debugPipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
- 		debugPipelineDesc.NumRenderTargets = 5;
- 		debugPipelineDesc.RTVFormats[0] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+	{
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC debugPipelineDesc = {};
+		debugPipelineDesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
+		debugPipelineDesc.pRootSignature = rootSignature.Get();
+		debugPipelineDesc.VS = {
+		reinterpret_cast<BYTE*>(mShaders["debugVS"]->GetBufferPointer()),
+		mShaders["debugVS"]->GetBufferSize()
+		};
+		debugPipelineDesc.PS = {
+		reinterpret_cast<BYTE*>(mShaders["debugPS"]->GetBufferPointer()),
+		mShaders["debugPS"]->GetBufferSize()
+		};
+		debugPipelineDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		debugPipelineDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		debugPipelineDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		debugPipelineDesc.SampleMask = UINT_MAX;
+		debugPipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		debugPipelineDesc.NumRenderTargets = 5;
+		debugPipelineDesc.RTVFormats[0] = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		debugPipelineDesc.RTVFormats[1] = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		debugPipelineDesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		debugPipelineDesc.RTVFormats[3] = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		debugPipelineDesc.RTVFormats[4] = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	
- 		debugPipelineDesc.SampleDesc.Count = 1;
- 		debugPipelineDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
- 		ThrowIfFailed(device->CreateGraphicsPipelineState(&debugPipelineDesc, IID_PPV_ARGS(&debugPipelineState)));
- 	}
+
+		debugPipelineDesc.SampleDesc.Count = 1;
+		debugPipelineDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		ThrowIfFailed(device->CreateGraphicsPipelineState(&debugPipelineDesc, IID_PPV_ARGS(&debugPipelineState)));
+	}
 
 
 	{
@@ -718,9 +731,9 @@ void BuildPipelineState()
 			ThrowIfFailed(device->CreateGraphicsPipelineState(&FinalPSODesc, IID_PPV_ARGS(&FinalPipelineState)));
 
 		}
-	
-	
-	
+
+
+
 	}
 
 
@@ -733,7 +746,7 @@ void BuildPipelineState()
 
 	ThrowIfFailed(commandList->Close());
 }
-void BuildVertexIndexBuffer()
+void SampleCode::BuildVertexIndexBuffer()
 {
 	{
 		// 		const UINT vertexBufferSize = sizeof(meshes[0].vertices);
@@ -798,7 +811,7 @@ void BuildVertexIndexBuffer()
 		indexBufferView.SizeInBytes = indexBufferSize;
 	}
 }
-void BuildDepthStencilBuffer()
+void SampleCode::BuildDepthStencilBuffer()
 {
 	CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
@@ -828,7 +841,7 @@ void BuildDepthStencilBuffer()
 
 }
 
-void LoadAsset()
+void SampleCode::LoadAsset()
 {
 	BuildRootSignature();
 	BuildPipelineState();
@@ -838,66 +851,66 @@ void LoadAsset()
 
 
 
-		CD3DX12_RANGE readRange(0, 0);
-		CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		const UINT constantBufferSize = CalcConstantBufferByteSize<SceneConstantBuffer>();
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&constantBuffer)));
-		constantBuffer->SetName(L"constantBuffer");
+	CD3DX12_RANGE readRange(0, 0);
+	CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	const UINT constantBufferSize = CalcConstantBufferByteSize<SceneConstantBuffer>();
+	ThrowIfFailed(device->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&constantBuffer)));
+	constantBuffer->SetName(L"constantBuffer");
 
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hCbvSrvHeap(cbvsrvHeap->
-			GetCPUDescriptorHandleForHeapStart());
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = constantBuffer->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = constantBufferSize;
-		device->CreateConstantBufferView(&cbvDesc, hCbvSrvHeap);
-		ThrowIfFailed(constantBuffer->Map(0, &readRange, 
-			reinterpret_cast<void**>(&pCbvDataBegin)));
-
-
-
-
-		const UINT objCBsize =CalcConstantBufferByteSize<ObjConstantBuffer>();
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(objCBsize*meshIndex),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&ObjCBResource)));
-
-		cbvDesc.BufferLocation = ObjCBResource->GetGPUVirtualAddress();
-		hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
-		cbvDesc.SizeInBytes = objCBsize;
-		device->CreateConstantBufferView(&cbvDesc, hCbvSrvHeap);
-		ThrowIfFailed(ObjCBResource->Map(0, &readRange, 
-			reinterpret_cast<void**>(&pobjCbvDataBegin)));
-		ObjCBResource->SetName(L"objCB");
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hCbvSrvHeap(cbvsrvHeap->
+		GetCPUDescriptorHandleForHeapStart());
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = constantBuffer->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = constantBufferSize;
+	device->CreateConstantBufferView(&cbvDesc, hCbvSrvHeap);
+	ThrowIfFailed(constantBuffer->Map(0, &readRange,
+		reinterpret_cast<void**>(&pCbvDataBegin)));
 
 
 
 
-		
-		matCBsize = sizeof(MaterialConstants);
-		ThrowIfFailed(device->CreateCommittedResource(
-			&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(mMaterial.size() * matCBsize),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&MaterialCBResource)));
+	const UINT objCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
+	ThrowIfFailed(device->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(objCBsize * meshIndex),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&ObjCBResource)));
 
-	
-		//D3D12_SHADER_BUFFER_DESC;
-		ThrowIfFailed(MaterialCBResource->Map(0, &readRange,
-			reinterpret_cast<void**>(&pMatCbvDataBegin)));
-		MaterialCBResource->SetName(L"MaterialCBResource");
+	cbvDesc.BufferLocation = ObjCBResource->GetGPUVirtualAddress();
+	hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
+	cbvDesc.SizeInBytes = objCBsize;
+	device->CreateConstantBufferView(&cbvDesc, hCbvSrvHeap);
+	ThrowIfFailed(ObjCBResource->Map(0, &readRange,
+		reinterpret_cast<void**>(&pobjCbvDataBegin)));
+	ObjCBResource->SetName(L"objCB");
+
+
+
+
+
+	matCBsize = sizeof(MaterialConstants);
+	ThrowIfFailed(device->CreateCommittedResource(
+		&heapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(mMaterial.size() * matCBsize),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&MaterialCBResource)));
+
+
+	//D3D12_SHADER_BUFFER_DESC;
+	ThrowIfFailed(MaterialCBResource->Map(0, &readRange,
+		reinterpret_cast<void**>(&pMatCbvDataBegin)));
+	MaterialCBResource->SetName(L"MaterialCBResource");
 
 	hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
 	//目前还没有用过上一个shader resource 的view 
@@ -917,7 +930,7 @@ void LoadAsset()
 		texDesc.SampleDesc.Quality = 0;
 		texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-		
+
 		const float clearColor[] = { 0.690196097f, 0.768627524f, 0.870588303f, 1.000000000f };
 		CD3DX12_CLEAR_VALUE GBufferClearValue = { DXGI_FORMAT_R32G32B32A32_FLOAT,clearColor };
 
@@ -974,7 +987,7 @@ void LoadAsset()
 	}
 }
 
-void PopulateCommandList()
+void SampleCode::PopulateCommandList()
 {
 	ThrowIfFailed(commandAllocator->Reset());
 	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), pipelineState.Get()));
@@ -1011,16 +1024,16 @@ void PopulateCommandList()
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 	commandList->IASetIndexBuffer(&indexBufferView);
 
-	commandList->SetGraphicsRootConstantBufferView(1, cbaddress );
-//  	for (auto t : mObjRenderItems) {
-// 
-//  	commandList->SetGraphicsRootConstantBufferView(1, cbaddress + t.second.ObjCBIndex * ObjCBsize);
-//  	commandList->DrawIndexedInstanced(t.second.IndicesCount, 1, t.second.StartIndexLocation, t.second.BaseVertexLocation, 0);
-//  	}
+	commandList->SetGraphicsRootConstantBufferView(1, cbaddress);
+	//  	for (auto t : mObjRenderItems) {
+	// 
+	//  	commandList->SetGraphicsRootConstantBufferView(1, cbaddress + t.second.ObjCBIndex * ObjCBsize);
+	//  	commandList->DrawIndexedInstanced(t.second.IndicesCount, 1, t.second.StartIndexLocation, t.second.BaseVertexLocation, 0);
+	//  	}
 
 
-	{	
-		
+	{
+
 		commandList->SetPipelineState(debugPipelineState.Get());
 		GBufferResources[0]->SetName(L"GBufferResources0");
 		GBufferResources[1]->SetName(L"GBufferResources1");
@@ -1031,12 +1044,12 @@ void PopulateCommandList()
 			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBufferResources[i].Get(),
 				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 		}
-		
-		
- 		commandList->ClearRenderTargetView(GBufferRtvHanle, clearColor, 0, nullptr);
-		commandList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvHeap->GetCPUDescriptorHandleForHeapStart(), 3, rtvDescriptorSize),clearColor, 0, nullptr);
- 		commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-		
+
+
+		commandList->ClearRenderTargetView(GBufferRtvHanle, clearColor, 0, nullptr);
+		commandList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvHeap->GetCPUDescriptorHandleForHeapStart(), 3, rtvDescriptorSize), clearColor, 0, nullptr);
+		commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
 		commandList->OMSetRenderTargets(5, &GBufferRtvHanle, true, &dsvHandle);
 
 		for (auto t : mObjRenderItems)
@@ -1049,36 +1062,36 @@ void PopulateCommandList()
 		for (int i = 0; i < _countof(GBufferResources); i++)
 		{
 			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBufferResources[i].Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 		}
 
 
 		//commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
- 		//commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		//commandList->ClearDepthStencilView(dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 		commandList->SetPipelineState(FinalPipelineState.Get());
 		cbvsrvHeap->GetGPUDescriptorHandleForHeapStart();
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 		commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
-		auto hsrv=CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvsrvHeap->GetGPUDescriptorHandleForHeapStart(), 2,cbvsrvDescriptorSize);
- 		commandList->SetGraphicsRootDescriptorTable(3,hsrv);
+		auto hsrv = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvsrvHeap->GetGPUDescriptorHandleForHeapStart(), 2, cbvsrvDescriptorSize);
+		commandList->SetGraphicsRootDescriptorTable(3, hsrv);
 
-		for (auto &t:TestTextureRenderItem)
-	 	{
-	 		commandList->DrawIndexedInstanced(t.IndicesCount, 1, t.StartIndexLocation, t.BaseVertexLocation, 0);
-	 	}
+		for (auto& t : TestTextureRenderItem)
+		{
+			commandList->DrawIndexedInstanced(t.IndicesCount, 1, t.StartIndexLocation, t.BaseVertexLocation, 0);
+		}
 
-		
+
 
 
 	}
 
 
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex].Get(),D3D12_RESOURCE_STATE_RENDER_TARGET , D3D12_RESOURCE_STATE_PRESENT));
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	ThrowIfFailed(commandList->Close());
 }
 
-void OnUpdate()
+void SampleCode::OnUpdate()
 {
 
 	if (offset <= 3.0f && isOffset)
@@ -1108,41 +1121,41 @@ void OnUpdate()
 	passCBconstants.ViewPos = camera.getPosition();
 	passCBconstants.Look = camera.getmLook();
 	passCBconstants.Up = camera.getmUp();
-	passCBconstants.Right = camera.getmRight(); 
+	passCBconstants.Right = camera.getmRight();
 	passCBconstants.AmbientLight = { 0.01f, 0.01f, 0.01f, 1.0f };
 	passCBconstants.Lights[0].Position = { -0.0000,1.90000,0.00000 };
 	passCBconstants.Lights[0].SpotPower = 0.8f;
 	passCBconstants.Lights[0].Strength = { 1.0f,1.0f, 1.0f };
 	memcpy(pCbvDataBegin, &passCBconstants, sizeof(passCBconstants));
 
-	
-	for (auto &t:mObjRenderItems)
+
+	for (auto& t : mObjRenderItems)
 	{
 		ObjConstantBuffer tempobjCB;
 		auto tempObjIndex = t.second.ObjCBIndex;
 		tempobjCB.MaterialIndex = t.second.mat.matCBIndex;
 
-		XMStoreFloat4x4(&tempobjCB.TexTransform , InitMatrix4X4());
-		XMStoreFloat4x4(&tempobjCB.WorldTransform , InitMatrix4X4());
-		memcpy(&pobjCbvDataBegin[tempObjIndex *ObjCBsize], &tempobjCB, sizeof(ObjConstantBuffer));
+		XMStoreFloat4x4(&tempobjCB.TexTransform, InitMatrix4X4());
+		XMStoreFloat4x4(&tempobjCB.WorldTransform, InitMatrix4X4());
+		memcpy(&pobjCbvDataBegin[tempObjIndex * ObjCBsize], &tempobjCB, sizeof(ObjConstantBuffer));
 
 	}
-	for (int i=0;i<mMaterial.size();i++)
+	for (int i = 0; i < mMaterial.size(); i++)
 	{
 		MaterialConstants tempMat;
 		tempMat.Ambient = mMaterial[i].ambient;
 		tempMat.Diffuse = mMaterial[i].diffuse;
 		tempMat.Specular = mMaterial[i].specular;
 		XMStoreFloat4x4(&tempMat.MatTransform, InitMatrix4X4());
-		memcpy(&pMatCbvDataBegin[i* matCBsize], &tempMat, sizeof(MaterialConstants));
+		memcpy(&pMatCbvDataBegin[i * matCBsize], &tempMat, sizeof(MaterialConstants));
 	}
-	
-	
+
+
 
 
 }
 
-void OnRender()
+void SampleCode::OnRender()
 {
 	PopulateCommandList();
 
@@ -1153,7 +1166,7 @@ void OnRender()
 
 	WaitForPreviousFrame();
 }
-void OnDestroy()
+void SampleCode::OnDestroy()
 {
 	WaitForPreviousFrame();
 
@@ -1165,14 +1178,16 @@ void OnDestroy()
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+
+
 	switch (message)
 	{
 	case WM_PAINT:
-		OnUpdate();
-		OnRender();
+		sample.OnUpdate();
+		sample.OnRender();
 		return 0;
 	case WM_MOUSEMOVE:
-		OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+		sample.OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -1194,7 +1209,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
 	RegisterClassEx(&windowClass);
 
-	hwnd = CreateWindow(
+	 hwnd = CreateWindow(
 		windowClass.lpszClassName,
 		L"TTRenderEr",
 		WS_OVERLAPPEDWINDOW,
@@ -1209,11 +1224,11 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 
 	camera.SetPosition(-3.0f, 1.0f, 0.0f);
 	ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
-	InitD3DResource();
-	LoadModels("Resources/anotherCornellBox.obj");
-	GenerateTestTextureRenderItem(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
+	sample.InitD3DResource();
+	sample.LoadModels("Resources/anotherCornellBox.obj");
+	sample.GenerateTestTextureRenderItem(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
 	//GenerateTestTextureRenderItem(0.0f, -0.5, 0.5f, 0.5f, 0.0f);
-	LoadAsset();
+	sample.LoadAsset();
 
 	ShowWindow(hwnd, SW_SHOW);
 
@@ -1231,7 +1246,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 		}
 	}
 
-	OnDestroy();
+	sample.OnDestroy();
 
 	return 0;
 }
@@ -1260,7 +1275,7 @@ ComPtr<ID3DBlob> CompileShader(
 
 	return byteCode;
 }
-void GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth)
+void SampleCode::GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth)
 {
 	Mesh tempMesh;
 	tempMesh.vertices.resize(4);
@@ -1300,7 +1315,7 @@ void GenerateTestTextureRenderItem(float x, float y, float w, float h, float dep
 	IndexOffset += 6;
 
 }
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers()
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> SampleCode::GetStaticSamplers()
 {
 	// Applications usually only need a handful of samplers.  So just define them all up front
 	// and keep them available as part of the root signature.  
@@ -1369,4 +1384,3 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers()
 		shadow
 	};
 }
-
