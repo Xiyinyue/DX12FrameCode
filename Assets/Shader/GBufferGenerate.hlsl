@@ -21,7 +21,7 @@ cbuffer SceneConstantBuffer : register(b0)
     float4 Up;
     float4 Right;
     float4 AmbientLight;
-    //float4x4 
+    float4x4 LightSpaceMatrix;
     Light Lights[MaxLights];
 }
 

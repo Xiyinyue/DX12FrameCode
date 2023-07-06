@@ -1,5 +1,18 @@
 #pragma once
 #include"common.h"
+class ShadowMapClass
+{
+public:
+	Microsoft::WRL::ComPtr<ID3D12Resource>mSMResource;
+	UINT SrvHeapindex;
+	UINT DsvHeapindex;
+
+};
+
+
+
+
+
 class SampleCode
 {
 public:
@@ -21,9 +34,10 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> cbvsrvHeap;
 
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> pipelineState;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> GBufferPSO;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> FinalPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> FinalPSO;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> ShadowMappingPSO;
+	
 
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
@@ -35,11 +49,13 @@ public:
 	D3D12_INDEX_BUFFER_VIEW indexBufferView;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilBuffer;
-
 	Microsoft::WRL::ComPtr<ID3D12Resource> constantBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource>ObjCBResource;
-
 	Microsoft::WRL::ComPtr<ID3D12Resource> MaterialCBResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource>GBufferResources[5];
+	ShadowMapClass mShadowMap;
+
+
 
 	UINT8* pCbvDataBegin;
 	UINT8* pobjCbvDataBegin;
@@ -66,7 +82,7 @@ public:
 	BYTE* imageData;
 	//
 
-	Microsoft::WRL::ComPtr<ID3D12Resource>GBufferResources[5];
+
 
 	//
 	POINT lastMousePos;

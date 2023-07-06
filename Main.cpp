@@ -256,7 +256,7 @@ void SampleCode::InitD3DResource()
 		rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		//
 		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-		dsvHeapDesc.NumDescriptors = 1;
+		dsvHeapDesc.NumDescriptors = 2;
 		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		ThrowIfFailed(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)));
@@ -345,6 +345,8 @@ void SampleCode::BuildShadersAndInputLayout()
 		mShaders["FinalVS"] = CompileShader(L"Assets/Shader/FinalCompute.hlsl", nullptr, "VS", "vs_5_0");
 		mShaders["FinalPS"] = CompileShader(L"Assets/Shader/FinalCompute.hlsl", nullptr, "PS", "ps_5_0");
 
+		mShaders["shadowMappingVS"]= CompileShader(L"Assets/Shader/ShadowMapGenerate.hlsl", nullptr, "VSOnlyMain", "vs_5_0");
+
 		mInputLayout =
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -360,38 +362,13 @@ void SampleCode::BuildShadersAndInputLayout()
 void SampleCode::BuildPipelineState()
 {
 
-
+	
 	{
 		BuildShadersAndInputLayout();
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-		psoDesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
-		psoDesc.pRootSignature = rootSignature.Get();
-		psoDesc.VS = {
-		reinterpret_cast<BYTE*>(mShaders["FinalVS"]->GetBufferPointer()),
-		mShaders["FinalVS"]->GetBufferSize()
-		};
-		psoDesc.PS = {
-		reinterpret_cast<BYTE*>(mShaders["FinalPS"]->GetBufferPointer()),
-		mShaders["FinalPS"]->GetBufferSize()
-		};
-		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-		psoDesc.SampleMask = UINT_MAX;
-		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
-		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.SampleDesc.Count = 1;
-		psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-		ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineState)));
 	}
 
 
-
-
-
-
+	// build Render a Gbuffer Pso
 	{
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC GBufferPSODesc = {};
 		GBufferPSODesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
@@ -423,6 +400,7 @@ void SampleCode::BuildPipelineState()
 
 
 	{
+		//build Final Render a quad 's PSO
 		{
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC FinalPSODesc = {};
 			FinalPSODesc.InputLayout = { mInputLayout.data(),(UINT)mInputLayout.size() };
@@ -445,17 +423,57 @@ void SampleCode::BuildPipelineState()
 
 			FinalPSODesc.SampleDesc.Count = 1;
 			FinalPSODesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-			ThrowIfFailed(device->CreateGraphicsPipelineState(&FinalPSODesc, IID_PPV_ARGS(&FinalPipelineState)));
+			ThrowIfFailed(device->CreateGraphicsPipelineState(&FinalPSODesc, IID_PPV_ARGS(&FinalPSO)));
 
+		
+		
+
+	  // PSO for shadow map pass.
+	  //
+
+			D3D12_RASTERIZER_DESC mRasterizerStateShadow;
+			mRasterizerStateShadow.FillMode = D3D12_FILL_MODE_SOLID;
+			mRasterizerStateShadow.CullMode = D3D12_CULL_MODE_BACK;
+			mRasterizerStateShadow.FrontCounterClockwise = FALSE;
+			mRasterizerStateShadow.SlopeScaledDepthBias = 10.0f;
+			mRasterizerStateShadow.DepthBias = 0.05f;
+			mRasterizerStateShadow.DepthClipEnable = FALSE;
+			mRasterizerStateShadow.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+			mRasterizerStateShadow.MultisampleEnable = FALSE;
+			mRasterizerStateShadow.AntialiasedLineEnable = FALSE;
+			mRasterizerStateShadow.ForcedSampleCount = 0;
+			mRasterizerStateShadow.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = FinalPSODesc;
+			smapPsoDesc.RasterizerState = mRasterizerStateShadow;
+			smapPsoDesc.pRootSignature = rootSignature.Get();
+			smapPsoDesc.VS =
+			{
+				reinterpret_cast<BYTE*>(mShaders["shadowMappingVS"]->GetBufferPointer()),
+				mShaders["shadowMappingVS"]->GetBufferSize()
+			};
+			smapPsoDesc.PS = { 
+				nullptr,
+				0 
+			};
+			// Shadow map pass does not have a render target.
+			smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+			smapPsoDesc.NumRenderTargets = 0;
+			ThrowIfFailed(device->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&ShadowMappingPSO)));
+
+		
+		
+		
+		
+		
 		}
-
 
 
 	}
 
 
 
-	ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), pipelineState.Get(), IID_PPV_ARGS(&commandList)));
+	ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), FinalPSO.Get(), IID_PPV_ARGS(&commandList)));
 
 
 
@@ -758,7 +776,7 @@ void SampleCode::RenderGBuffer()
 void SampleCode::FinalRender()
 {
 	ThrowIfFailed(commandAllocator->Reset());
-	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), pipelineState.Get()));
+	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), FinalPSO.Get()));
 
 	commandList->SetGraphicsRootSignature(rootSignature.Get());
 	ID3D12DescriptorHeap* ppHeaps[] = { cbvsrvHeap.Get() };
@@ -798,7 +816,7 @@ void SampleCode::FinalRender()
 		RenderGBuffer();
 
 
-		commandList->SetPipelineState(FinalPipelineState.Get());
+		commandList->SetPipelineState(FinalPSO.Get());
 		cbvsrvHeap->GetGPUDescriptorHandleForHeapStart();
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 		commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
@@ -849,12 +867,34 @@ void SampleCode::OnUpdate()
 	XMStoreFloat4x4(&passCBconstants.MVP, XMMatrixTranspose(MVP));
 	XMStoreFloat4x4(&passCBconstants.gWorld, XMMatrixTranspose(m));
 
+	//下面是创建光源视图矩阵
+	// 为了创建一个视图矩阵来变换每个物体，把它们变换到从光源视角可见的空间中，
+	// 我们将使用XMMatrixLookToRH函数；这次从光源的位置看向场景中央。
+	//注意Direction不能为0，
 	XMFLOAT3 lightPosition= { -0.0000,1.90000,0.00000 };
 	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
-	XMVECTOR direction = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
 	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-	//XMMATRIX lightViewMatrix = XMMatrixLookToRH(eyePosition, direction, upDirection);
+	XMMATRIX lightViewMatrix = XMMatrixLookToRH(eyePosition, direction, upDirection);
 
+	//步骤2：创建光源投影矩阵
+	// 因为我们使用的是一个所有光线都平行的定向光。
+	// 出于这个原因，我们将为光源使用正交投影矩阵，透视图将没有任何变形：
+
+	float nearPlane = 1.0f;
+	float farPlane = 100.0f;
+	float Oriwidth = 10.0f;
+	float Oriheight = 10.0f;
+
+	// 步骤3：创建光照空间矩阵
+	XMMATRIX lightProjectionMatrix = XMMatrixOrthographicRH(Oriwidth, Oriheight, nearPlane, farPlane);
+	XMMATRIX lightSpaceMatrix = lightViewMatrix * lightProjectionMatrix;
+
+	//二者相结合为我们提供了一个光空间的变换矩阵，
+	//它将每个世界空间坐标变换到光源处所见到的那个空间；这正是我们渲染深度贴图所需要的。
+	// 
+
+	XMStoreFloat4x4(&passCBconstants.LightSpaceMatrix,XMMatrixTranspose(lightSpaceMatrix));
 
 
 
@@ -866,6 +906,8 @@ void SampleCode::OnUpdate()
 	passCBconstants.Lights[0].Position = { -0.0000,1.90000,0.00000 };
 	passCBconstants.Lights[0].SpotPower = 0.8f;
 	passCBconstants.Lights[0].Strength = { 1.0f,1.0f, 1.0f };
+
+
 	memcpy(pCbvDataBegin, &passCBconstants, sizeof(passCBconstants));
 
 

@@ -66,8 +66,8 @@ struct SceneConstantBuffer
 	XMFLOAT4 Look;
 	XMFLOAT4 Up;
 	XMFLOAT4 Right;
-
 	DirectX::XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
+	XMFLOAT4X4 LightSpaceMatrix;
 	Light Lights[MAXLIGHTS];
 };
 struct ObjConstantBuffer
