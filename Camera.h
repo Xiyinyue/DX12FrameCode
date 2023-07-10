@@ -10,7 +10,9 @@ public:
 	~Camera();
 
 	void SetPosition(float x, float y, float z);
-
+	void SetUp(float x, float y, float z);
+	void SetRight(float x, float y, float z); 
+	void SetLook(float x, float y, float z);
 
 	XMFLOAT3 getPosition();
 	void SetLens(float fovY, float aspect, float zn, float zf);

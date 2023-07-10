@@ -293,20 +293,21 @@ void SampleCode::BuildRootSignature()
 	mCbvSrvUavDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	{
 
-		CD3DX12_DESCRIPTOR_RANGE ranges[2];
-		CD3DX12_ROOT_PARAMETER rootParameters[4];
+		CD3DX12_DESCRIPTOR_RANGE ranges[3];
+		CD3DX12_ROOT_PARAMETER rootParameters[5];
 
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 1, 0);
+		ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 7, 0);
 
 		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
 		rootParameters[1].InitAsConstantBufferView(1);
 		rootParameters[2].InitAsShaderResourceView(0);
 		rootParameters[3].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
-
+		rootParameters[4].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
 
 		auto staticSamplers = GetStaticSamplers();
-		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(4, rootParameters, (UINT)staticSamplers.size(), staticSamplers.data(),
+		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(5, rootParameters, (UINT)staticSamplers.size(), staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		// create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
 		Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSig = nullptr;
@@ -729,7 +730,7 @@ void SampleCode::BuildDescriptors()
 
 		D3D12_CLEAR_VALUE optClear;
 		optClear.Format = DXGI_FORMAT_D32_FLOAT;
-		optClear.DepthStencil.Depth = 0.0f;
+		optClear.DepthStencil.Depth = 1.0f;
 		optClear.DepthStencil.Stencil = 0;
 
 		ThrowIfFailed(device->CreateCommittedResource(
@@ -764,7 +765,7 @@ void SampleCode::BuildDescriptors()
 		dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
 		dsvDesc.Texture2D.MipSlice = 0;
 		device->CreateDepthStencilView(mShadowMap.Get(), &dsvDesc, CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvHeap->GetCPUDescriptorHandleForHeapStart(),CurrentDsvHeapIndex,DsvHeapDescriptorSize));
-	
+		mShadowMap.DsvHeapindex = CurrentDsvHeapIndex++;
 	
 	
 	
@@ -800,7 +801,7 @@ void SampleCode::RenderShadowMap()
 	commandList->RSSetScissorRects(1, &scissorRect);
 	auto cbaddress = ObjCBResource->GetGPUVirtualAddress();
 	const float clearColor[] = { 0.690196097f, 0.768627524f, 0.870588303f, 1.000000000f };
-	auto ShadowMappingDsvCpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvHeap->GetCPUDescriptorHandleForHeapStart(), mShadowMap.DsvHeapindex , DsvHeapDescriptorSize);
+	auto ShadowMappingDsvCpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvHeap->GetCPUDescriptorHandleForHeapStart(), mShadowMap.DsvHeapindex, DsvHeapDescriptorSize);
 	
 	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
@@ -932,8 +933,9 @@ void SampleCode::FinalRender()
 		commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 		commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
 		auto hsrv = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvsrvHeap->GetGPUDescriptorHandleForHeapStart(), 2, cbvsrvDescriptorSize);
+		auto SMSrv = CD3DX12_GPU_DESCRIPTOR_HANDLE(cbvsrvHeap->GetGPUDescriptorHandleForHeapStart(), mShadowMap.SrvHeapindex-1, cbvsrvDescriptorSize);
 		commandList->SetGraphicsRootDescriptorTable(3, hsrv);
-
+		commandList->SetGraphicsRootDescriptorTable(4, SMSrv);
 		for (auto& t : TestTextureRenderItem)
 		{
 			commandList->DrawIndexedInstanced(t.IndicesCount, 1, t.StartIndexLocation, t.BaseVertexLocation, 0);
@@ -982,24 +984,24 @@ void SampleCode::OnUpdate()
 	// 为了创建一个视图矩阵来变换每个物体，把它们变换到从光源视角可见的空间中，
 	// 我们将使用XMMatrixLookToRH函数；这次从光源的位置看向场景中央。
 	//注意Direction不能为0，
-	XMFLOAT3 lightPosition= { -0.0000,1.60000,0.00000 };
+	XMFLOAT3 lightPosition = { -3.0000f, 1.0f, 0.00000f };
 	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
-	XMVECTOR direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
-	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	XMVECTOR direction = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR upDirection = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	XMMATRIX lightViewMatrix = XMMatrixLookToRH(eyePosition, direction, upDirection);
 
 	//步骤2：创建光源投影矩阵
 	// 因为我们使用的是一个所有光线都平行的定向光。
 	// 出于这个原因，我们将为光源使用正交投影矩阵，透视图将没有任何变形：
 
-	float nearPlane = 1.0f;
-	float farPlane = 5.0f;
-	float Oriwidth = 10.0f;
-	float Oriheight = 10.0f;
-
+	float nearPlane = 0.1f;  // 根据实际需要调整近平面的值
+	float farPlane = 20.0f;  // 根据实际需要调整远平面的值
+	float aspectRatio = width / height;  // 屏幕宽高比，根据实际需要替换为正确的值
+	float fovAngle = XM_PIDIV4;  // 光照投影的视野角度，根据实际需要调整
 	// 步骤3：创建光照空间矩阵
-	XMMATRIX lightProjectionMatrix = XMMatrixOrthographicRH(Oriwidth, Oriheight, nearPlane, farPlane);
-	XMMATRIX lightSpaceMatrix = lightViewMatrix * lightProjectionMatrix;
+
+	XMMATRIX lightProjectionMatrix = XMMatrixPerspectiveFovRH(fovAngle, aspectRatio, nearPlane, farPlane);
+	XMMATRIX lightSpaceMatrix = m*lightViewMatrix * lightProjectionMatrix;
 
 	//二者相结合为我们提供了一个光空间的变换矩阵，
 	//它将每个世界空间坐标变换到光源处所见到的那个空间；这正是我们渲染深度贴图所需要的。

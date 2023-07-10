@@ -37,7 +37,7 @@ struct VertexOut
 };
 
 Texture2D GBuffer[5]:register(t1);
-
+Texture2D ShadowMap : register(t7);
 
 
 VertexOut VS(VerttexIn input)
@@ -82,6 +82,6 @@ float4 PS(VertexOut pin): SV_TARGET
     a.rgb = pow(a.rgb, float(1 / gamma));
     a.a = 1;
      float3 lightVec = Lights[0].Position - Position;
-    return a;
+   return a;
     //return float4(lightVec,1.0f);
 }

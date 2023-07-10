@@ -45,9 +45,15 @@ struct VertexOut
 float4 VSOnlyMain(VSinput input):SV_Position
 {
     float4 result;
-    result = mul(WorldTransform, float4(input.PosL.xyz, 1));
-    result = mul(LightSpaceMatrix, result);
-    result.z *= result.w;
+ 
+    //result = mul(float4(input.PosL.xyz, 1),WorldTransform );
+   // result = mul(result, LightSpaceMatrix);
+    result = mul(float4(input.PosL.xyz, 1), LightSpaceMatrix);
+   // result.z *= result.w;  
     return result;
+    
+   // float4 debr;  
+    //debr = mul(float4(input.PosL.xyz, 1), MVP);
+   // return debr;
       
 }

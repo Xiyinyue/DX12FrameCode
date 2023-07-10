@@ -14,6 +14,22 @@ void Camera::SetPosition(float x, float y, float z)
 	mPosition = XMFLOAT3(x, y, z);
 	mViewDirty = true;
 }
+void Camera::SetUp(float x, float y, float z)
+{
+	mUp = XMFLOAT3(x, y, z);
+	mViewDirty = true;
+}
+void Camera::SetRight(float x, float y, float z)
+{
+	mRight = XMFLOAT3(x, y, z);
+	mViewDirty = true;
+}
+void Camera::SetLook(float x, float y, float z)
+{
+	mLook = XMFLOAT3(x, y, z);
+	mViewDirty = true;
+}
+
 XMFLOAT3 Camera::getPosition()
 {
 	return mPosition;
