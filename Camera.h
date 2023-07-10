@@ -33,9 +33,9 @@ public:
 private:
 
 	XMFLOAT3 mPosition = { 0.0f, 0.0f, 0.0f };
-	XMFLOAT3 mRight = { 0.0f, 0.0f, -1.0f };
+	XMFLOAT3 mRight = { 1.0f, 0.0f, 0.0f };
 	XMFLOAT3 mUp = { 0.0f, 1.0f, 0.0f };
-	XMFLOAT3 mLook = { 1.0f, 0.0f, 0.0f };
+	XMFLOAT3 mLook = { 0.0f, 0.0f, 1.0f };
 
 	float mNearZ = 0.0f;
 	float mFarZ = 0.0f;

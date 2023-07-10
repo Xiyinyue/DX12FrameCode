@@ -434,9 +434,11 @@ void SampleCode::BuildPipelineState()
 	  // PSO for shadow map pass.
 	  //
 
-			D3D12_RASTERIZER_DESC mRasterizerStateShadow;
+
+
+			CD3DX12_RASTERIZER_DESC mRasterizerStateShadow = {};
 			mRasterizerStateShadow.FillMode = D3D12_FILL_MODE_SOLID;
-			mRasterizerStateShadow.CullMode = D3D12_CULL_MODE_BACK;
+			mRasterizerStateShadow.CullMode = D3D12_CULL_MODE_NONE;
 			mRasterizerStateShadow.FrontCounterClockwise = FALSE;
 			mRasterizerStateShadow.SlopeScaledDepthBias = 10.0f;
 			mRasterizerStateShadow.DepthBias = 0.05f;
@@ -444,8 +446,6 @@ void SampleCode::BuildPipelineState()
 			mRasterizerStateShadow.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
 			mRasterizerStateShadow.MultisampleEnable = FALSE;
 			mRasterizerStateShadow.AntialiasedLineEnable = FALSE;
-			mRasterizerStateShadow.ForcedSampleCount = 0;
-			mRasterizerStateShadow.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
 			D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = FinalPSODesc;
 			smapPsoDesc.RasterizerState = mRasterizerStateShadow;
@@ -972,8 +972,8 @@ void SampleCode::OnUpdate()
 
 	XMMATRIX translation = XMMatrixTranslation(0.0f, 0.0f, 0.0f);
 	XMMATRIX scale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-	XMMATRIX rotation = XMMatrixRotationAxis({ 0.0f, 1.0f, 0.0f }, XMConvertToRadians(90.0f));
-	XMMATRIX m = scale * rotation * translation;
+	//XMMATRIX rotation = XMMatrixRotationAxis({ 0.0f, 1.0f, 0.0f }, XMConvertToRadians(90.0f));
+	XMMATRIX m = scale  * translation;
 	XMMATRIX MVP = m * v * p;
 
 	SceneConstantBuffer passCBconstants;
@@ -984,24 +984,25 @@ void SampleCode::OnUpdate()
 	// 为了创建一个视图矩阵来变换每个物体，把它们变换到从光源视角可见的空间中，
 	// 我们将使用XMMatrixLookToRH函数；这次从光源的位置看向场景中央。
 	//注意Direction不能为0，
-	XMFLOAT3 lightPosition = { -3.0000f, 1.0f, 0.00000f };
+	XMFLOAT3 lightPosition = { 0.0000f, 1.9f, 0.0f };
 	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
-	XMVECTOR direction = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR upDirection = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	XMMATRIX lightViewMatrix = XMMatrixLookToRH(eyePosition, direction, upDirection);
+	XMVECTOR direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
+	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
+	XMMATRIX lightViewMatrix = XMMatrixLookToLH(eyePosition, direction, upDirection);
 
+	
 	//步骤2：创建光源投影矩阵
 	// 因为我们使用的是一个所有光线都平行的定向光。
 	// 出于这个原因，我们将为光源使用正交投影矩阵，透视图将没有任何变形：
 
-	float nearPlane = 0.1f;  // 根据实际需要调整近平面的值
-	float farPlane = 20.0f;  // 根据实际需要调整远平面的值
+	float nearPlane = 0.5f;  // 根据实际需要调整近平面的值
+	float farPlane = 40.0f;  // 根据实际需要调整远平面的值
 	float aspectRatio = width / height;  // 屏幕宽高比，根据实际需要替换为正确的值
 	float fovAngle = XM_PIDIV4;  // 光照投影的视野角度，根据实际需要调整
 	// 步骤3：创建光照空间矩阵
 
-	XMMATRIX lightProjectionMatrix = XMMatrixPerspectiveFovRH(fovAngle, aspectRatio, nearPlane, farPlane);
-	XMMATRIX lightSpaceMatrix = m*lightViewMatrix * lightProjectionMatrix;
+	XMMATRIX lightProjectionMatrix = XMMatrixPerspectiveFovLH(fovAngle, aspectRatio, nearPlane, farPlane);
+	XMMATRIX lightSpaceMatrix = lightViewMatrix * lightProjectionMatrix;
 
 	//二者相结合为我们提供了一个光空间的变换矩阵，
 	//它将每个世界空间坐标变换到光源处所见到的那个空间；这正是我们渲染深度贴图所需要的。
@@ -1117,7 +1118,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 		hInstance,
 		nullptr);
 
-	sample->camera.SetPosition(-3.0f, 1.0f, 0.0f);
+	sample->camera.SetPosition(0.0000f, 1.9f, 0.0f);
 	sample->ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
 	sample->InitD3DResource();
 	sample->LoadModels("Resources/anotherCornellBox.obj");
