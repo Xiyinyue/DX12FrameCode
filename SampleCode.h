@@ -6,8 +6,32 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource>mSMResource;
 	UINT SrvHeapindex;
 	UINT DsvHeapindex;
-
+	ID3D12Resource* ShadowMapClass::Get();
 };
+ID3D12Resource* ShadowMapClass::Get()
+{
+	return mSMResource.Get();
+}
+
+
+
+
+class GBufferClass
+{
+public:
+	Microsoft::WRL::ComPtr<ID3D12Resource>GBufferResource;
+	UINT SrvHeapindex;
+	UINT DsvHeapindex;
+	UINT rtvHeapindex;
+	ID3D12Resource* GBufferClass::Get();
+};
+ID3D12Resource* GBufferClass::Get()
+{
+	return GBufferResource.Get();
+
+}
+
+
 
 
 
@@ -52,7 +76,7 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource> constantBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource>ObjCBResource;
 	Microsoft::WRL::ComPtr<ID3D12Resource> MaterialCBResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource>GBufferResources[5];
+	GBufferClass mGBuffer[5];
 	ShadowMapClass mShadowMap;
 
 
@@ -64,6 +88,10 @@ public:
 	UINT ObjCBsize;
 	UINT matCBsize;
 	UINT mCbvSrvUavDescriptorSize = 0;
+	UINT DsvHeapDescriptorSize = 0;
+	UINT CurrentDsvHeapIndex = 0;
+	UINT CurrentRtvHeapIndex = 0;
+	UINT CurrentCbvSrvUavHeapIndex = 0;
 	// 同步对象
 	UINT frameIndex;
 	HANDLE fenceEvent;
@@ -107,7 +135,8 @@ public:
 	void OnMouseMove(WPARAM btnState, int x, int y);
 	void FinalRender();
 	void WaitForPreviousFrame();
-	void LoadAsset();
+	void BuildDescriptors();
+	void RenderShadowMap();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPipelineState();

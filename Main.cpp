@@ -260,10 +260,11 @@ void SampleCode::InitD3DResource()
 		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		ThrowIfFailed(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)));
+		DsvHeapDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 		//
 		D3D12_DESCRIPTOR_HEAP_DESC cbvsrvHeapDesc = {};
 		// sceneCB  ObjCB  MaterialCB 
-		cbvsrvHeapDesc.NumDescriptors = 7;
+		cbvsrvHeapDesc.NumDescriptors = 8;
 		cbvsrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		cbvsrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		ThrowIfFailed(device->CreateDescriptorHeap(&cbvsrvHeapDesc, IID_PPV_ARGS(&cbvsrvHeap)));
@@ -278,6 +279,7 @@ void SampleCode::InitD3DResource()
 		ThrowIfFailed(swapChain->GetBuffer(n, IID_PPV_ARGS(&renderTargets[n])));
 		device->CreateRenderTargetView(renderTargets[n].Get(), nullptr, rtvHandle);
 		rtvHandle.Offset(1, rtvDescriptorSize);
+		CurrentRtvHeapIndex++;
 	}
 
 
@@ -572,18 +574,16 @@ void SampleCode::BuildDepthStencilBuffer()
 		IID_PPV_ARGS(&depthStencilBuffer)));
 
 	device->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
-
+	CurrentDsvHeapIndex++;
 
 }
 
-void SampleCode::LoadAsset()
+void SampleCode::BuildDescriptors()
 {
 	BuildRootSignature();
 	BuildPipelineState();
 	BuildVertexIndexBuffer();
 	BuildDepthStencilBuffer();
-
-
 
 
 	CD3DX12_RANGE readRange(0, 0);
@@ -605,6 +605,8 @@ void SampleCode::LoadAsset()
 	cbvDesc.BufferLocation = constantBuffer->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = constantBufferSize;
 	device->CreateConstantBufferView(&cbvDesc, hCbvSrvHeap);
+	//index
+	CurrentCbvSrvUavHeapIndex++;
 	ThrowIfFailed(constantBuffer->Map(0, &readRange,
 		reinterpret_cast<void**>(&pCbvDataBegin)));
 
@@ -624,6 +626,7 @@ void SampleCode::LoadAsset()
 	hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
 	cbvDesc.SizeInBytes = objCBsize;
 	device->CreateConstantBufferView(&cbvDesc, hCbvSrvHeap);
+	CurrentCbvSrvUavHeapIndex++;
 	ThrowIfFailed(ObjCBResource->Map(0, &readRange,
 		reinterpret_cast<void**>(&pobjCbvDataBegin)));
 	ObjCBResource->SetName(L"objCB");
@@ -646,7 +649,7 @@ void SampleCode::LoadAsset()
 	ThrowIfFailed(MaterialCBResource->Map(0, &readRange,
 		reinterpret_cast<void**>(&pMatCbvDataBegin)));
 	MaterialCBResource->SetName(L"MaterialCBResource");
-
+	CurrentCbvSrvUavHeapIndex++;
 	hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
 	//目前还没有用过上一个shader resource 的view 
 	//我们看看堆里这个view 是否用过
@@ -677,7 +680,7 @@ void SampleCode::LoadAsset()
 				&texDesc,
 				D3D12_RESOURCE_STATE_GENERIC_READ,
 				&GBufferClearValue,
-				IID_PPV_ARGS(&GBufferResources[i])));
+				IID_PPV_ARGS(&mGBuffer[i].GBufferResource)));
 		}
 
 
@@ -696,16 +699,85 @@ void SampleCode::LoadAsset()
 		rtvDesc.Texture2D.PlaneSlice = 0;
 
 		auto hGBufferRtvHeapStartCpu = CD3DX12_CPU_DESCRIPTOR_HANDLE(rtvHeap->GetCPUDescriptorHandleForHeapStart(), 2, rtvDescriptorSize);
-		for (int i = 0; i < _countof(GBufferResources); i++)
+		for (int i = 0; i < _countof(mGBuffer); i++)
 		{
-			device->CreateRenderTargetView(GBufferResources[i].Get(), &rtvDesc, hGBufferRtvHeapStartCpu);
-			device->CreateShaderResourceView(GBufferResources[i].Get(), &srvDesc, hCbvSrvHeap);
+			device->CreateRenderTargetView(mGBuffer[i].Get(), &rtvDesc, hGBufferRtvHeapStartCpu);
+			mGBuffer[i].rtvHeapindex = CurrentRtvHeapIndex++;
+			device->CreateShaderResourceView(mGBuffer[i].Get(), &srvDesc, hCbvSrvHeap);
+			mGBuffer[i].SrvHeapindex = CurrentCbvSrvUavHeapIndex++;
 			hGBufferRtvHeapStartCpu.Offset(1, rtvDescriptorSize);
 			hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
 		}
 
 
 	}
+
+	{
+		D3D12_RESOURCE_DESC texDesc;
+		ZeroMemory(&texDesc, sizeof(D3D12_RESOURCE_DESC));
+		texDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		texDesc.Alignment = 0;
+		texDesc.Width = 800;
+		texDesc.Height = 600;
+		texDesc.DepthOrArraySize = 1;
+		texDesc.MipLevels = 1;
+		texDesc.Format = DXGI_FORMAT_D32_FLOAT;
+		texDesc.SampleDesc.Count = 1;
+		texDesc.SampleDesc.Quality = 0;
+		texDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		texDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+		D3D12_CLEAR_VALUE optClear;
+		optClear.Format = DXGI_FORMAT_D32_FLOAT;
+		optClear.DepthStencil.Depth = 0.0f;
+		optClear.DepthStencil.Stencil = 0;
+
+		ThrowIfFailed(device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&texDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			&optClear,
+			IID_PPV_ARGS(&mShadowMap.mSMResource)));
+
+
+
+
+		// Create SRV to resource so we can sample the shadow map in a shader program.
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MostDetailedMip = 0;
+		srvDesc.Texture2D.MipLevels = 1;
+		srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+		srvDesc.Texture2D.PlaneSlice = 0;
+		device->CreateShaderResourceView(mShadowMap.Get(), &srvDesc, hCbvSrvHeap);
+		hCbvSrvHeap.Offset(1, mCbvSrvUavDescriptorSize);
+		mShadowMap.SrvHeapindex = CurrentCbvSrvUavHeapIndex++;
+
+
+		// Create DSV to resource so we can render to the shadow map.
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
+		dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+		dsvDesc.Texture2D.MipSlice = 0;
+		device->CreateDepthStencilView(mShadowMap.Get(), &dsvDesc, CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvHeap->GetCPUDescriptorHandleForHeapStart(),CurrentDsvHeapIndex,DsvHeapDescriptorSize));
+	
+	
+	
+	
+	
+	}
+
+
+
+
+
+
+
+
 
 
 
@@ -722,6 +794,42 @@ void SampleCode::LoadAsset()
 	}
 }
 
+void SampleCode::RenderShadowMap()
+{
+	commandList->RSSetViewports(1, &viewport);
+	commandList->RSSetScissorRects(1, &scissorRect);
+	auto cbaddress = ObjCBResource->GetGPUVirtualAddress();
+	const float clearColor[] = { 0.690196097f, 0.768627524f, 0.870588303f, 1.000000000f };
+	auto ShadowMappingDsvCpuHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvHeap->GetCPUDescriptorHandleForHeapStart(), mShadowMap.DsvHeapindex , DsvHeapDescriptorSize);
+	
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+
+	commandList->ClearDepthStencilView(ShadowMappingDsvCpuHandle, D3D12_CLEAR_FLAG_DEPTH| D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	commandList->OMSetRenderTargets(0, nullptr, FALSE, &ShadowMappingDsvCpuHandle);
+
+
+	commandList->SetGraphicsRootDescriptorTable(0, cbvsrvHeap->GetGPUDescriptorHandleForHeapStart());
+	commandList->SetGraphicsRootConstantBufferView(1, cbaddress);
+
+	commandList->SetPipelineState(ShadowMappingPSO.Get());
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetIndexBuffer(&indexBufferView);
+	for (auto t : mObjRenderItems)
+	{
+		commandList->SetGraphicsRootConstantBufferView(1, cbaddress + t.second.ObjCBIndex * ObjCBsize);
+		commandList->DrawIndexedInstanced(t.second.IndicesCount, 1, t.second.StartIndexLocation, t.second.BaseVertexLocation, 0);
+	}
+
+
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+	
+
+
+}
 void SampleCode::RenderGBuffer()
 {
 
@@ -744,10 +852,10 @@ void SampleCode::RenderGBuffer()
 	
 		commandList->SetPipelineState(GBufferPSO.Get());
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE GBufferRtvHanle(rtvHeap->GetCPUDescriptorHandleForHeapStart(), 2, rtvDescriptorSize);
-		for (int i = 0; i < _countof(GBufferResources); i++)
+		CD3DX12_CPU_DESCRIPTOR_HANDLE GBufferRtvHanle(rtvHeap->GetCPUDescriptorHandleForHeapStart(), mGBuffer[0].rtvHeapindex, rtvDescriptorSize);
+		for (int i = 0; i < _countof(mGBuffer); i++)
 		{
-			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBufferResources[i].Get(),
+			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mGBuffer[i].Get(),
 				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 		}
 
@@ -765,13 +873,15 @@ void SampleCode::RenderGBuffer()
 		}
 
 
-		for (int i = 0; i < _countof(GBufferResources); i++)
+		for (int i = 0; i < _countof(mGBuffer); i++)
 		{
-			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBufferResources[i].Get(),
+			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mGBuffer[i].Get(),
 				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 		}
 
 }
+
+
 
 void SampleCode::FinalRender()
 {
@@ -813,6 +923,7 @@ void SampleCode::FinalRender()
 	commandList->SetGraphicsRootConstantBufferView(1, cbaddress);
 
 	{
+		RenderShadowMap();
 		RenderGBuffer();
 
 
@@ -871,7 +982,7 @@ void SampleCode::OnUpdate()
 	// 为了创建一个视图矩阵来变换每个物体，把它们变换到从光源视角可见的空间中，
 	// 我们将使用XMMatrixLookToRH函数；这次从光源的位置看向场景中央。
 	//注意Direction不能为0，
-	XMFLOAT3 lightPosition= { -0.0000,1.90000,0.00000 };
+	XMFLOAT3 lightPosition= { -0.0000,1.60000,0.00000 };
 	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
 	XMVECTOR direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
 	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
@@ -882,7 +993,7 @@ void SampleCode::OnUpdate()
 	// 出于这个原因，我们将为光源使用正交投影矩阵，透视图将没有任何变形：
 
 	float nearPlane = 1.0f;
-	float farPlane = 100.0f;
+	float farPlane = 5.0f;
 	float Oriwidth = 10.0f;
 	float Oriheight = 10.0f;
 
@@ -1010,7 +1121,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 	sample->LoadModels("Resources/anotherCornellBox.obj");
 	sample->GenerateTestTextureRenderItem(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
 	//GenerateTestTextureRenderItem(0.0f, -0.5, 0.5f, 0.5f, 0.0f);
-	sample->LoadAsset();
+	sample->BuildDescriptors();
 
 	ShowWindow(hwnd, SW_SHOW);
 
