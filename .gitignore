@@ -68,3 +68,11 @@ x64/Debug/myCodeFrame.tlog/link.command.1.tlog
 x64/Debug/myCodeFrame.tlog/link.read.1.tlog
 x64/Debug/myCodeFrame.tlog/link.write.1.tlog
 x64/Debug/myCodeFrame.tlog/myCodeFrame.lastbuildstate
+<<<<<<< Updated upstream
+=======
+.vs/CodeFrame/v16/ipch/AutoPCH/f8f9d88c81ffd724/CAMERA.ipch
+.vs/CodeFrame/v16/ipch/AutoPCH/f8f9d88c81ffd724/CAMERA.ipch
+.vs/CodeFrame/v16/ipch/AutoPCH/f8f9d88c81ffd724/CAMERA.ipch
+*.ipch
+*.ipch
+>>>>>>> Stashed changes

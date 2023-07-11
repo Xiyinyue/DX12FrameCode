@@ -37,6 +37,31 @@ struct VertexOut
 };
 
 Texture2D GBuffer[5]:register(t1);
+<<<<<<< Updated upstream
+=======
+Texture2D ShadowMap : register(t7);
+
+
+float CalculateShadow(float3 shadowcoord)
+{
+   //float result = ShadowMap.Sample(gsamPointWrap,shadowcoord.xy);
+    float result = ShadowMap.SampleCmpLevelZero(gsamShadow, shadowcoord.xy, (shadowcoord.z));
+    return result;
+   // float result = ShadowMap.Sample(gsamLinearWrap, shadowcoord.xy);
+  // if (result > shadowcoord.z)
+  //     return 1;
+  // else
+  //     return 0;
+    
+}
+
+
+
+
+
+
+
+>>>>>>> Stashed changes
 
 
 
@@ -67,6 +92,7 @@ float4 PS(VertexOut pin): SV_TARGET
    float4 tempSpecular=GBuffer[3].Sample(gsamPointWrap,pin.TexC);
      float3 Specular= tempSpecular.rgb;
      
+<<<<<<< Updated upstream
       float4 tempAmbient=GBuffer[4].Sample(gsamPointWrap,pin.TexC);
      float3 Ambient= tempAmbient.rgb;
     Material mat={Diffuse,1,Specular,1,Ambient,1};
@@ -85,3 +111,42 @@ float4 PS(VertexOut pin): SV_TARGET
     return a;
     //return float4(lightVec,1.0f);
 }
+=======
+        float4 tempAmbient = GBuffer[4].Sample(gsamPointWrap, pin.TexC);
+        float3 Ambient = tempAmbient.rgb;
+        Material mat = { Diffuse, 1, Specular, 1, Ambient, 1 };
+        
+       float shadow =0.0f;
+            float4 lightSpacePos = mul(float4(Position, 1.0f),LightSpaceMatrix);
+            float4 shadowcoord = lightSpacePos / lightSpacePos.w;
+    
+            shadowcoord.rg = shadowcoord.rg * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+    if (shadowcoord.b > 0)
+        shadow = CalculateShadow(shadowcoord.rgb);
+    else
+        shadow = 1;
+        float3 toEye = normalize(viewPos - Position);
+        float4 a = ComputePointLight(Lights[0], mat, Position, Normal, toEye, shadow);
+
+            a.w = 1;
+        
+    
+    
+    
+    
+    
+    
+    
+    
+        float gamma = 0.5;
+        a.rgb = pow(a.rgb, float(1 / gamma));
+        a.a = 1;
+        float3 lightVec = Lights[0].Position - Position;
+     return a;
+    return float4(lightVec,1.0f);
+    
+    float Debugresult = ShadowMap.Sample(gsamPointWrap, pin.TexC);
+    return float4(Debugresult, Debugresult, Debugresult, 1);
+    
+    }
+>>>>>>> Stashed changes
