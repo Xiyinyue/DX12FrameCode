@@ -8,4 +8,7 @@ I am changing it ,don't  hurry
 1. 注意光源矩阵的构造
 2. 本程序是基于**点光源**
 3. 注意本程序采取的是**列向量**，所 以你需要注意对于列向量来说我们的乘法是如何构造的，是左乘还是右乘
-4. 
+4. 关于shadowmapping的文件放在`shadowmapping`分支里面
+5. 注意对于shadowmapping PSO的构造和修改
+6. 注意GBufferPSO的类型，以及Texture的类型
+7. 这个程序有一个很烂的架构，所以不推荐学习
