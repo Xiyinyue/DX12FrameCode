@@ -1,7 +1,6 @@
 
 
 #define MaxLights 16
-
 struct Light
 {
     float3 Strength;
@@ -28,7 +27,7 @@ float CalcAttenuation(float d, float falloffStart, float falloffEnd)
     return saturate((falloffEnd - d) / (falloffEnd - falloffStart));
 }
 
-float3 myBlinnPhongOfThreeParameters(Material mat,float3 LightStrength,float3 toeye,float3 lightVec,float3 normal)
+float3 myBlinnPhongOfThreeParameters(Material mat,float3 LightStrength,float3 toeye,float3 lightVec,float3 normal,float ShadowFactor)
 {
     //L=La+Ld+Ls
    //KaIa+kd(I/r^2)max(0,n.dot(l))+ks(I/r^2)max(0,n.dot(h))^p
@@ -36,14 +35,14 @@ float3 myBlinnPhongOfThreeParameters(Material mat,float3 LightStrength,float3 to
     float3 halfVect = normalize(toeye + lightVec);
     float hdotp= max(dot(normal, halfVect), 0.0f);
     float ndotl = max(dot(lightVec, normal), 0.0f);
-    float3 litcolor = (mat.Specular * LightStrength * hdotp) + (ndotl * LightStrength * mat.Diffuse) + mat.Ambient * LightStrength;
+    float3 litcolor = ((mat.Specular * LightStrength * hdotp) + (ndotl * LightStrength * mat.Diffuse)) * (ShadowFactor) + mat.Ambient * LightStrength;
    // float3 litcolor = (ndotl * LightStrength * mat.Diffuse) + mat.Ambient * LightStrength;
     return litcolor;
 
 }
 
 
-float4 ComputePointLight(Light L, Material mat, float3 pos, float3 normal, float3 toEye)
+float4 ComputePointLight(Light L, Material mat, float3 pos, float3 normal, float3 toEye,float shadow)
 {
     //L=La+Ld+Ls
     //KaIa+kd(I/r^2)max(0,n.dot(l))+ks(I/r^2)max(0,n.dot(h))^p
@@ -67,7 +66,7 @@ normal=normalize(tempNormal);
     float att = CalcAttenuation(d, L.FalloffStart, L.FalloffEnd);
     lightStrength = L.Strength * att;
 
-    return float4(myBlinnPhongOfThreeParameters(mat, lightStrength, toEye, normalize(lightVec), normalize(normal)), 1.0f);
+    return float4(myBlinnPhongOfThreeParameters(mat, lightStrength, toEye, normalize(lightVec), normalize(normal),shadow), 1.0f);
 
     //return  float4(0.5f,1.0f,1.0f,1.0f);
     //return float4(lightStrength, 1.0f);

@@ -145,5 +145,6 @@ public:
 	void GenerateTestTextureRenderItem(float x, float y, float w, float h, float depth);
 	void RenderGBuffer();
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
+	int frame = 0;
 };
 

@@ -440,10 +440,10 @@ void SampleCode::BuildPipelineState()
 			mRasterizerStateShadow.FillMode = D3D12_FILL_MODE_SOLID;
 			mRasterizerStateShadow.CullMode = D3D12_CULL_MODE_NONE;
 			mRasterizerStateShadow.FrontCounterClockwise = FALSE;
-			mRasterizerStateShadow.SlopeScaledDepthBias = 10.0f;
+			mRasterizerStateShadow.SlopeScaledDepthBias = 0.0f;
 			mRasterizerStateShadow.DepthBias = 0.05f;
-			mRasterizerStateShadow.DepthClipEnable = FALSE;
-			mRasterizerStateShadow.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+			mRasterizerStateShadow.DepthClipEnable = TRUE;
+			//mRasterizerStateShadow.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
 			mRasterizerStateShadow.MultisampleEnable = FALSE;
 			mRasterizerStateShadow.AntialiasedLineEnable = FALSE;
 
@@ -984,18 +984,24 @@ void SampleCode::OnUpdate()
 	// 为了创建一个视图矩阵来变换每个物体，把它们变换到从光源视角可见的空间中，
 	// 我们将使用XMMatrixLookToRH函数；这次从光源的位置看向场景中央。
 	//注意Direction不能为0，
-	XMFLOAT3 lightPosition = { 0.0000f, 1.9f, 0.0f };
+
+// 	XMFLOAT3 lightPosition = { 0.0000f, 2.0f, 0.0f };
+// 	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
+// 	XMVECTOR direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
+// 	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
+// 	XMMATRIX lightViewMatrix = XMMatrixLookToLH(eyePosition, direction, upDirection);
+
+	XMFLOAT3 lightPosition = { 0.0000f, 2.0f, 0.0f };
 	XMVECTOR eyePosition = XMLoadFloat3(&lightPosition);
 	XMVECTOR direction = XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
 	XMVECTOR upDirection = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
 	XMMATRIX lightViewMatrix = XMMatrixLookToLH(eyePosition, direction, upDirection);
-
 	
 	//步骤2：创建光源投影矩阵
 	// 因为我们使用的是一个所有光线都平行的定向光。
 	// 出于这个原因，我们将为光源使用正交投影矩阵，透视图将没有任何变形：
 
-	float nearPlane = 0.5f;  // 根据实际需要调整近平面的值
+	float nearPlane = 20.0f;  // 根据实际需要调整近平面的值
 	float farPlane = 40.0f;  // 根据实际需要调整远平面的值
 	float aspectRatio = width / height;  // 屏幕宽高比，根据实际需要替换为正确的值
 	float fovAngle = XM_PIDIV4;  // 光照投影的视野角度，根据实际需要调整
@@ -1118,7 +1124,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 		hInstance,
 		nullptr);
 
-	sample->camera.SetPosition(0.0000f, 1.9f, 0.0f);
+	sample->camera.SetPosition(0.0f, 1.0f, -3.0f);
 	sample->ObjCBsize = CalcConstantBufferByteSize<ObjConstantBuffer>();
 	sample->InitD3DResource();
 	sample->LoadModels("Resources/anotherCornellBox.obj");
